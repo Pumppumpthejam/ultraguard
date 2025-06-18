@@ -30,8 +30,8 @@
                                         <td>{{ device.name }}</td>
                                         <td>{{ device.imei }}</td>
                                         <td>
-                                            <span class="badge {% if device.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                                {{ 'Active' if device.is_active else 'Inactive' }}
+                                            <span class="badge {% if device.status == 'active' %}bg-success{% else %}bg-danger{% endif %}">
+                                                {{ 'Active' if device.status == 'active' else 'Inactive' }}
                                             </span>
                                         </td>
                                         <td>{{ device.last_seen.strftime('%Y-%m-%d %H:%M') if device.last_seen else 'Never' }}</td>

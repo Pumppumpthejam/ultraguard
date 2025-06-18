@@ -737,12 +737,10 @@ def add_client_device(client_id):
             name=form.name.data,
             imei=form.imei.data,
             model=form.model.data,
-            # Use client_id from the URL parameter for association
             client_id=client_id,
             status=form.status.data,
             last_seen=form.last_seen.data,
-            notes=form.notes.data,
-            is_active=form.is_active.data
+            notes=form.notes.data
         )
 
         try:
@@ -804,8 +802,7 @@ def add_device():
                 client_id=form.client_id.data,
                 status=form.status.data,
                 last_seen=form.last_seen.data,
-                notes=form.notes.data,
-                is_active=form.is_active.data
+                notes=form.notes.data
             )
             
             db.session.add(device)
@@ -901,7 +898,6 @@ def edit_device(device_id):
             device.status = form.status.data
             device.last_seen = form.last_seen.data
             device.notes = form.notes.data
-            device.is_active = form.is_active.data
             
             db.session.commit()
             flash(f'Device "{device.name}" updated successfully!', 'success')

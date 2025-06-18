@@ -183,7 +183,6 @@ class DeviceForm(FlaskForm):
     ], validators=[DataRequired()])
     last_seen = DateTimeField('Last Seen', format='%Y-%m-%dT%H:%M', validators=[Optional()])
     notes = TextAreaField('Notes', validators=[Optional(), Length(max=500)])
-    is_active = BooleanField('Device is Active', default=True)
     submit = SubmitField('Save Device')
 
     def validate_imei(self, imei):
