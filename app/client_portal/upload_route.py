@@ -1,6 +1,5 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_required, current_user
-from werkzeug.urls import url_parse
 from app import db
 from app.models import Shift, Device, UploadedPatrolReport
 from app.client_portal.forms import PatrolReportUploadForm
