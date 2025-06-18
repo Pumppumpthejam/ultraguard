@@ -56,12 +56,12 @@ class CheckpointForm(FlaskForm):
 
 class PatrolReportUploadForm(FlaskForm):
     shift_id = SelectField('Select Shift to Associate Report With', coerce=int, validators=[DataRequired()])
-    report_file = FileField('Patrol Report CSV File', validators=[
+    report_file = FileField('iTalk Geo Fence Report File', validators=[
         FileRequired(),
-        FileAllowed(['csv'], 'CSV files only!')
+        FileAllowed(['csv', 'xlsx'], 'CSV or XLSX files only!')
     ])
     source_system = StringField('Source System (e.g., italk ptt)', default='italk ptt', validators=[Optional(), Length(max=50)])
-    submit_report = SubmitField('Upload and Process Report')
+    submit_report = SubmitField('Upload iTalk Geo Fence report')
 
     def __init__(self, *args, **kwargs):
         super(PatrolReportUploadForm, self).__init__(*args, **kwargs)

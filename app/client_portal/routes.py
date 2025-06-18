@@ -139,6 +139,7 @@ def logout():
 def dashboard():
     if not (hasattr(current_user, 'is_client_user_type') and current_user.is_client_user_type()):
         flash('Please log in to access the client portal', 'info')
+        logout_user()
         return redirect(url_for('client_portal.login'))
 
     client = current_user.client

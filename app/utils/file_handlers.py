@@ -7,6 +7,7 @@ from app.exceptions import (
     FileUploadError, InvalidFileTypeError, CSVValidationError,
     MissingHeaderError, DataTypeError, DeviceIdentifierMismatchError
 )
+import pandas as pd
 
 def get_upload_path(client_id, report_id):
     """Generate a secure path for storing uploaded files."""
@@ -260,4 +261,84 @@ def validate_and_read_csv_data(file_path: str):
         raise
     except Exception as e:
         current_app.logger.error(f"Unexpected error reading CSV '{file_path}': {str(e)}", exc_info=True)
-        raise CSVValidationError(f"An unexpected error occurred while reading the CSV file: {str(e)}") 
+        raise CSVValidationError(f"An unexpected error occurred while reading the CSV file: {str(e)}")
+
+def validate_report_structure(file_path):
+    """Validate the structure of the uploaded report file (CSV or XLSX)."""
+    required_columns = {'Device_Identifier', 'Timestamp', 'Latitude', 'Longitude'}
+    ext = os.path.splitext(file_path)[1].lower()
+    try:
+        if ext == '.csv':
+            df = pd.read_csv(file_path)
+        elif ext == '.xlsx':
+            df = pd.read_excel(file_path)
+        else:
+            raise InvalidFileTypeError('Invalid file type. Only CSV or XLSX files are allowed.')
+        headers = set(df.columns)
+        missing_columns = required_columns - headers
+        if missing_columns:
+            raise MissingHeaderError(missing_columns)
+        # Validate first row for data types
+        if df.empty:
+            raise CSVValidationError("Report file is empty (no data rows)")
+        first_row = df.iloc[0]
+        try:
+            float(first_row['Latitude'])
+        except ValueError:
+            raise DataTypeError('Latitude', 'float')
+        try:
+            float(first_row['Longitude'])
+        except ValueError:
+            raise DataTypeError('Longitude', 'float')
+        try:
+            datetime.strptime(str(first_row['Timestamp']), '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            raise DataTypeError('Timestamp', 'datetime (YYYY-MM-DD HH:MM:SS)')
+        return True
+    except Exception as e:
+        if isinstance(e, CSVValidationError):
+            raise
+        current_app.logger.error(f"Error validating report file: {str(e)}", exc_info=True)
+        raise CSVValidationError(f"Error validating report file: {str(e)}")
+
+def read_report_data(file_path):
+    """Read and parse the report file data (CSV or XLSX)."""
+    locations = []
+    errors = []
+    ext = os.path.splitext(file_path)[1].lower()
+    try:
+        if ext == '.csv':
+            df = pd.read_csv(file_path)
+        elif ext == '.xlsx':
+            df = pd.read_excel(file_path)
+        else:
+            raise InvalidFileTypeError('Invalid file type. Only CSV or XLSX files are allowed.')
+        for row_num, row in df.iterrows():
+            try:
+                location = {
+                    'device_identifier': row['Device_Identifier'],
+                    'timestamp': datetime.strptime(str(row['Timestamp']), '%Y-%m-%d %H:%M:%S'),
+                    'latitude': float(row['Latitude']),
+                    'longitude': float(row['Longitude']),
+                    'event_type': row.get('Event_Type', ''),
+                    'event_details': row.get('Event_Details', '')
+                }
+                locations.append(location)
+            except ValueError as e:
+                error_msg = f"Error in row {row_num+2}: {str(e)}"
+                errors.append(error_msg)
+                current_app.logger.warning(error_msg)
+            except KeyError as e:
+                error_msg = f"Missing required column in row {row_num+2}: {str(e)}"
+                errors.append(error_msg)
+                current_app.logger.warning(error_msg)
+        if not locations:
+            raise CSVValidationError("No valid location data found in report file")
+        if errors:
+            current_app.logger.warning(f"Found {len(errors)} errors while reading report file")
+        return locations
+    except Exception as e:
+        if isinstance(e, CSVValidationError):
+            raise
+        current_app.logger.error(f"Error reading report data: {str(e)}", exc_info=True)
+        raise CSVValidationError(f"Error reading report data: {str(e)}") 
