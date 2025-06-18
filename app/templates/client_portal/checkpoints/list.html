@@ -10,6 +10,7 @@
                 <div class="card-header">
                     <i class="fas fa-map-marker-alt me-1"></i>
                     Checkpoints
+                    <a href="{{ url_for('client_portal.add_checkpoint') }}" class="btn btn-sm btn-success float-end">+ Add Checkpoint</a>
                 </div>
                 <div class="card-body">
                     {% if checkpoints %}
@@ -22,6 +23,7 @@
                                         <th>Radius</th>
                                         <th>Description</th>
                                         <th>Created</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -32,6 +34,9 @@
                                         <td>{{ checkpoint.radius }}m</td>
                                         <td>{{ checkpoint.description }}</td>
                                         <td>{{ checkpoint.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>
+                                            <a href="{{ url_for('client_portal.edit_checkpoint', id=checkpoint.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>

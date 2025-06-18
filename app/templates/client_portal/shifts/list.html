@@ -10,6 +10,7 @@
                 <div class="card-header">
                     <i class="fas fa-clock me-1"></i>
                     Shifts
+                    <a href="{{ url_for('client_portal.add_shift') }}" class="btn btn-sm btn-success float-end">+ Add Shift</a>
                 </div>
                 <div class="card-body">
                     {% if shifts %}
@@ -22,19 +23,19 @@
                                         <th>Start Time</th>
                                         <th>End Time</th>
                                         <th>Status</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% for shift in shifts %}
                                     <tr>
-                                        <td>{{ shift.device.name }}</td>
-                                        <td>{{ shift.shift_type }}</td>
-                                        <td>{{ shift.start_time.strftime('%Y-%m-%d %H:%M') }}</td>
-                                        <td>{{ shift.end_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>{{ shift.device.name if shift.device else 'N/A' }}</td>
+                                        <td>{{ shift.shift_type|title }}</td>
+                                        <td>{{ shift.scheduled_start_time.strftime('%Y-%m-%d %H:%M') if shift.scheduled_start_time else 'N/A' }}</td>
+                                        <td>{{ shift.scheduled_end_time.strftime('%Y-%m-%d %H:%M') if shift.scheduled_end_time else 'N/A' }}</td>
+                                        <td>{{ shift.status|title }}</td>
                                         <td>
-                                            <span class="badge {% if shift.status == 'Completed' %}bg-success{% elif shift.status == 'In Progress' %}bg-warning{% else %}bg-secondary{% endif %}">
-                                                {{ shift.status }}
-                                            </span>
+                                            <a href="{{ url_for('client_portal.edit_shift', id=shift.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
                                         </td>
                                     </tr>
                                     {% endfor %}

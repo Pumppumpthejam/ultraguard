@@ -615,6 +615,28 @@ def list_my_devices():
     devices = Device.query.filter_by(client_id=current_user.client.id).all()
     return render_template('client_portal/devices/list.html', title='My Devices', devices=devices)
 
+@bp.route('/devices/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_device(id):
+    if not current_user.is_client_user_type():
+        flash('Please log in to access the client portal.', 'warning')
+        return redirect(url_for('client_portal.login'))
+    device = Device.query.filter_by(id=id, client_id=current_user.client_id).first_or_404()
+    from app.admin.forms import DeviceForm
+    form = DeviceForm(obj=device)
+    # Hide client_id field in the form for client users
+    form.client_id.data = device.client_id
+    if form.validate_on_submit():
+        device.name = form.name.data
+        device.model = form.model.data
+        device.status = form.status.data
+        device.last_seen = form.last_seen.data
+        device.notes = form.notes.data
+        db.session.commit()
+        flash('Device updated successfully!', 'success')
+        return redirect(url_for('client_portal.list_my_devices'))
+    return render_template('admin/devices/add_edit_device.html', title='Edit Device', form=form, device=device, form_legend='Edit Device')
+
 @bp.route('/reports/upload', methods=['GET', 'POST'])
 @login_required
 def upload_patrol_report():

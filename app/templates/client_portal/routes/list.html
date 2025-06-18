@@ -10,6 +10,7 @@
                 <div class="card-header">
                     <i class="fas fa-route me-1"></i>
                     Routes
+                    <a href="{{ url_for('client_portal.add_route') }}" class="btn btn-sm btn-success float-end">+ Add Route</a>
                 </div>
                 <div class="card-body">
                     {% if routes %}
@@ -21,6 +22,7 @@
                                         <th>Description</th>
                                         <th>Checkpoints</th>
                                         <th>Created</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -30,6 +32,9 @@
                                         <td>{{ route.description }}</td>
                                         <td>{{ route.checkpoints|length }}</td>
                                         <td>{{ route.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>
+                                            <a href="{{ url_for('client_portal.edit_route', id=route.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                        </td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
