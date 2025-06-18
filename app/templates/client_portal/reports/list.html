@@ -1,0 +1,58 @@
+{% extends "client_portal_base.html" %}
+
+{% block page_header %}My Patrol Reports{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-file-alt me-1"></i>
+                    Patrol Reports
+                </div>
+                <div class="card-body">
+                    {% if reports %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Device</th>
+                                        <th>Shift</th>
+                                        <th>Filename</th>
+                                        <th>Status</th>
+                                        <th>Uploaded</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for report in reports %}
+                                    <tr>
+                                        <td>{{ report.shift.device.name }}</td>
+                                        <td>{{ report.shift.shift_type }} ({{ report.shift.scheduled_start_time.strftime('%Y-%m-%d') }})</td>
+                                        <td>{{ report.filename }}</td>
+                                        <td>
+                                            <span class="badge {% if report.processing_status == 'Completed' %}bg-success{% elif report.processing_status == 'Processing' %}bg-warning{% elif report.processing_status == 'Failed' %}bg-danger{% else %}bg-secondary{% endif %}">
+                                                {{ report.processing_status }}
+                                            </span>
+                                        </td>
+                                        <td>{{ report.upload_timestamp.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>
+                                            <a href="{{ url_for('client_portal.view_report', report_id=report.id) }}" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-eye"></i> View
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-center">No patrol reports found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

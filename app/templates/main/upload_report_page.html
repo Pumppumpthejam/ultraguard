@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Patrol Report - Ultraguard{% endblock %}
+
+{% block content %}
+<div class="pg-header mt-5">
+    <h2>Upload Patrol Report</h2>
+</div>
+<hr>
+<p>This page will allow administrators to upload CSV patrol reports.</p>
+<p>Functionality will be implemented in Step 4.</p>
+
+{% if assignments %}
+    <p>You can select an assignment to link the report to (dropdown will be part of the form):</p>
+    <ul>
+    {% for assignment in assignments %}
+        <li>
+            Assignment #{{ assignment.id }}: Guard {{ assignment.guard.username }} on Route {{ assignment.assigned_route.name }} 
+            ( {{ assignment.scheduled_date.strftime('%Y-%m-%d') }} 
+            {{ assignment.scheduled_start_time.strftime('%H:%M') }} - 
+            {{ assignment.scheduled_end_time.strftime('%H:%M') }} )
+        </li>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No assignments available to link reports to. Please create assignments first.</p>
+{% endif %}
+{% endblock %} 

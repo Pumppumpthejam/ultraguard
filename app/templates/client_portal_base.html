@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ current_user.client.name if current_user.is_authenticated and current_user.client else 'Client Portal' }} - Ultraguard{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { font-size: .875rem; }
+        .sidebar {
+            position: fixed; top: 0; bottom: 0; left: 0; z-index: 100;
+            padding: 56px 0 0; /* Adjust if navbar height changes */
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1); width: 230px; /* Sidebar width */
+        }
+        .sidebar-sticky { 
+            position: relative; top: 0; height: calc(100vh - 56px); /* Adjust if navbar height changes */
+            padding-top: .5rem; overflow-x: hidden; overflow-y: auto;
+        }
+        .sidebar .nav-link { font-weight: 500; color: #333; padding: .5rem 1rem; }
+        .sidebar .nav-link .bi { margin-right: 10px; color: #555; width:18px; text-align:center; vertical-align: text-bottom;}
+        .sidebar .nav-link.active { color: #0d6efd; background-color: #e9ecef; }
+        .sidebar .nav-link:hover { background-color: #f8f9fa; }
+        .sidebar .nav-link.active .bi, .sidebar .nav-link:hover .bi { color: inherit; }
+        
+        .main-content { margin-left: 230px; padding: 20px; }
+        
+        .navbar-brand-client {
+             padding-top: .75rem;
+             padding-bottom: .75rem;
+             font-size: 1.1rem;
+             background-color: #0d6efd; /* Primary color or your choice */
+             box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+        }
+        .navbar-dark .navbar-brand-client { color: #fff; }
+        .navbar-dark .nav-link { color: rgba(255,255,255,.75); }
+        .navbar-dark .nav-link:hover { color: #fff; }
+
+        @media (max-width: 767.98px) { 
+          .sidebar { width:100%; height:auto; position:relative; top:0; padding-top:0; box-shadow:none;} 
+          .main-content { margin-left:0;}
+          .navbar-brand-client { text-align:center; width:100%; }
+          .navbar .navbar-nav { width: 100%; justify-content: flex-end;}
+        }
+        .flash-messages .alert { margin-bottom: 1rem; }
+    </style>
+</head>
+<body>
+    <header class="navbar navbar-dark sticky-top bg-primary flex-md-nowrap p-0 shadow">
+        <a class="navbar-brand-client col-md-3 col-lg-2 me-0 px-3 fs-6" href="{{ url_for('client_portal.dashboard') }}">
+            <i class="bi bi-shield-check me-2"></i>{% block portal_brand_name %}{{ current_user.client.name if current_user.is_authenticated and current_user.client else 'Client Portal' }}{% endblock %}
+        </a>
+        <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarClientMenu" aria-controls="sidebarClientMenu" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="navbar-nav ms-auto">
+            <div class="nav-item text-nowrap d-flex align-items-center">
+                {% if current_user.is_authenticated and current_user.is_client_user_type() %}
+                    <span class="navbar-text px-3">User: {{ current_user.username }}</span>
+                    <a class="nav-link px-3" href="{{ url_for('client_portal.logout') }}">Sign out <i class="bi bi-box-arrow-right"></i></a>
+                {% elif current_user.is_authenticated and current_user.is_ultraguard_admin() %}
+                     {# If an admin is somehow here, give them a way out #}
+                     <a class="nav-link px-3" href="{{ url_for('admin.dashboard') }}">Admin Dashboard</a>
+                     <a class="nav-link px-3" href="{{ url_for('admin.logout') }}">Sign out Admin <i class="bi bi-box-arrow-right"></i></a>
+                {% else %}
+                     <a class="nav-link px-3" href="{{ url_for('client_portal.login') }}">Sign in</a>
+                {% endif %}
+            </div>
+        </div>
+    </header>
+
+    <div class="container-fluid">
+        <div class="row">
+            <nav id="sidebarClientMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse">
+                <div class="sidebar-sticky pt-3">
+                    {% if current_user.is_authenticated and current_user.is_client_user_type() %}
+                    <ul class="nav flex-column">
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.endpoint == 'client_portal.dashboard' %}active{% endif %}" href="{{ url_for('client_portal.dashboard') }}">
+                                <i class="bi bi-house-door-fill"></i> Dashboard
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'site' in request.endpoint %}active{% endif %}" href="{{ url_for('client_portal.list_sites') }}">
+                                <i class="bi bi-pin-map-fill"></i> My Sites
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'checkpoint' in request.endpoint %}active{% endif %}" href="{{ url_for('client_portal.list_checkpoints') }}">
+                                <i class="bi bi-geo-alt-fill"></i> My Checkpoints
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'route' in request.endpoint %}active{% endif %}" href="{{ url_for('client_portal.list_routes') }}">
+                                <i class="bi bi-signpost-split-fill"></i> My Routes
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'shift' in request.endpoint %}active{% endif %}" href="{{ url_for('client_portal.list_shifts') }}">
+                                <i class="bi bi-calendar-week-fill"></i> My Shifts
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'device' in request.endpoint and 'my_devices' in request.endpoint %}active{% endif %}" href="{{ url_for('client_portal.list_my_devices') }}">
+                                <i class="bi bi-hdd-stack-fill"></i> My Devices
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'upload_patrol_report' in request.endpoint %}active{% endif %}" href="{{ url_for('client_portal.upload_patrol_report') }}">
+                                <i class="bi bi-file-earmark-arrow-up-fill"></i> Upload Report
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if 'list_uploaded_reports' in request.endpoint %}active{% endif %}" href="{{ url_for('client_portal.list_uploaded_reports') }}">
+                                <i class="bi bi-file-text-fill"></i> View Reports
+                            </a>
+                        </li>
+                        <hr>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#"> {# url_for('client_portal.account_settings') #}
+                                <i class="bi bi-person-circle"></i> Account
+                            </a>
+                        </li>
+                    </ul>
+                    {% endif %}
+                </div>
+            </nav>
+
+            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+                <div class="flash-messages mb-3">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                </div>
+                
+                {% block page_title_container %}
+                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                     <h1 class="h2">{% block page_header %}{% endblock %}</h1>
+                     <div class="btn-toolbar mb-2 mb-md-0">
+                         {% block page_actions %}{% endblock %}
+                     </div>
+                 </div>
+                {% endblock %}
+
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

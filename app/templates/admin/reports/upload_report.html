@@ -1,0 +1,61 @@
+{% extends "admin_base.html" %}
+{% from "_form_helpers.html" import render_field %}
+{% block title %}{{ title }} - Ultraguard Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <div>
+        <h1 class="h2">{{ title }}</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Upload Patrol Report</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Upload Patrol Report CSV</h5>
+                <form method="POST" action="" enctype="multipart/form-data" novalidate>
+                    {{ form.hidden_tag() }}
+                    {{ render_field(form.shift_id, class="form-select") }}
+                    {{ render_field(form.report_file, class="form-control") }}
+                    {{ render_field(form.source_system, class="form-control") }}
+                    {{ form.submit_report(class="btn btn-primary") }}
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Instructions</h5>
+                <p class="card-text">
+                    <ol>
+                        <li>Select the shift this report corresponds to</li>
+                        <li>Upload the CSV file containing the patrol report data</li>
+                        <li>Optionally specify the source system (e.g., italk ptt)</li>
+                        <li>Click "Upload and Process Report" to submit</li>
+                    </ol>
+                </p>
+                <div class="alert alert-info">
+                    <small>
+                        <strong>Note:</strong> The CSV file should contain the following columns:
+                        <ul class="mb-0">
+                            <li>timestamp</li>
+                            <li>latitude</li>
+                            <li>longitude</li>
+                            <li>checkpoint_id (optional)</li>
+                        </ul>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

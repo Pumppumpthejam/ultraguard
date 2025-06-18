@@ -1,0 +1,60 @@
+{% extends "admin_base.html" %}
+{% from "_form_helpers.html" import render_field %}
+{% block title %}{{ title }} - Ultraguard Admin{% endblock %}
+
+{% block content %}
+<div class="pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ title }}</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('admin.list_devices') }}">Devices</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Upload Devices</li>
+        </ol>
+    </nav>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Upload Devices via CSV</h5>
+                <form method="POST" action="" enctype="multipart/form-data" novalidate>
+                    {{ form.hidden_tag() }}
+                    {{ render_field(form.client_id, class="form-select mb-3") }}
+                    {{ render_field(form.csv_file, class="form-control mb-3") }}
+                    {{ form.submit_csv(class="btn btn-primary") }}
+                    <a href="{{ url_for('admin.list_devices') }}" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">CSV Format Instructions</h5>
+                <p class="card-text">Your CSV file should have the following columns:</p>
+                <ul class="list-unstyled">
+                    <li><strong>Required columns:</strong></li>
+                    <li><code>imei</code> - Device IMEI</li>
+                    <li><code>name</code> - Device name</li>
+                    <li><code>model</code> - Device model</li>
+                    <li><strong>Optional columns:</strong></li>
+                    <li><code>status</code> - Device status (active/inactive, defaults to active)</li>
+                    <li><code>last_seen</code> - Last seen timestamp (YYYY-MM-DD HH:MM:SS)</li>
+                    <li><code>notes</code> - Additional notes</li>
+                </ul>
+                <div class="alert alert-info mt-3">
+                    <small>
+                        <i class="bi bi-info-circle-fill"></i>
+                        Example CSV format:<br>
+                        <code>imei,name,model,status,last_seen,notes</code><br>
+                        <code>123456789012345,Device 1,Model X,active,2024-03-14 10:30:00,Test device notes</code>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

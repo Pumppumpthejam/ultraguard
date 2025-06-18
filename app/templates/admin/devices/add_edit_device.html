@@ -1,0 +1,51 @@
+
+{% extends "admin_base.html" %}
+{% from "_form_helpers.html" import render_field, render_select_field, render_checkbox_field %}
+{% block title %}{{ title }} - Ultraguard Admin{% endblock %}
+
+{% block content %}
+<div class="pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ form_legend if form_legend else title }}</h1>
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{{ url_for('admin.list_devices') }}">Devices</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ 'Add Device' if not device else 'Edit Device' }}</li>
+        </ol>
+    </nav>
+</div>
+
+<form method="POST" action="" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    {{ render_field(form.name, class="form-control") }}
+                    {{ render_field(form.imei, class="form-control") }}
+                    {{ render_field(form.model, class="form-control") }}
+                </div>
+                <div class="col-md-6">
+                    {{ render_select_field(form.client_id, class="form-select") }}
+                    {{ render_select_field(form.status, class="form-select") }}
+                    {{ render_field(form.last_seen, class="form-control", type="datetime-local") }}
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    {{ render_field(form.notes, class="form-control", rows="3") }}
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-12">
+                    {{ render_checkbox_field(form.is_active) }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="mt-4">
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('admin.list_devices') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{% endblock %} 

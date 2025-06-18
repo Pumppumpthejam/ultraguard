@@ -1,0 +1,47 @@
+{% extends "admin_base.html" %}
+{% from "_form_helpers.html" import render_field %}
+{% block title %}{{ title }} - Ultraguard Admin{% endblock %}
+
+{% block content %}
+<div class="pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ title }}</h1>
+</div>
+
+<form method="POST" action="{{ url_for('admin.edit_client', client_id=client.id) }}" novalidate>
+    {{ form.hidden_tag() }}
+    <div class="card shadow-sm">
+        <div class="card-header">
+            <h5 class="mb-0">Edit Client Details</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    {{ render_field(form.name, class="form-control") }}
+                    {{ render_field(form.contact_person, class="form-control") }}
+                </div>
+                <div class="col-md-6">
+                    {{ render_field(form.contact_email, class="form-control", type="email") }}
+                    {{ render_field(form.contact_phone, class="form-control", type="tel") }}
+                </div>
+            </div>
+            <div class="mb-3 form-check">
+                {{ form.is_active(class="form-check-input") }}
+                {{ form.is_active.label(class="form-check-label") }}
+            </div>
+        </div>
+    </div>
+    <div class="mt-4">
+        {{ form.submit(class="btn btn-primary") }}
+        <a href="{{ url_for('admin.list_clients') }}" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+{# Placeholder for managing this client's users, devices etc. #}
+<hr class="my-4">
+<h5>Manage Client Resources</h5>
+<p>
+    <!-- <a href="#" class="btn btn-info btn-sm">Manage Users for {{ client.name }}</a> -->
+    <a href="{{ url_for('admin.list_client_devices', client_id=client.id) }}" class="btn btn-info btn-sm">
+        <i class="bi bi-hdd-stack-fill"></i> Manage Devices for {{ client.name }}
+    </a>
+</p>
+{% endblock %} 

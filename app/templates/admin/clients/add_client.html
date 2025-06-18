@@ -1,0 +1,53 @@
+{% extends "admin_base.html" %}
+{% from "_form_helpers.html" import render_field %} {# We'll create this macro file #}
+{% block title %}{{ title }} - Ultraguard Admin{% endblock %}
+
+ {% block content %}
+ <div class="pt-3 pb-2 mb-3 border-bottom">
+     <h1 class="h2">{{ title }}</h1>
+ </div>
+
+ <form method="POST" action="{{ url_for('admin.add_client') }}" novalidate>
+     {{ client_form.hidden_tag() }}
+     {{ user_form.hidden_tag() }}
+
+     <div class="row">
+         <div class="col-md-6">
+             <div class="card shadow-sm mb-4">
+                 <div class="card-header">
+                     <h5 class="mb-0">Client Company Details</h5>
+                 </div>
+                 <div class="card-body">
+                     {{ render_field(client_form.name, class="form-control") }}
+                     {{ render_field(client_form.contact_person, class="form-control") }}
+                     {{ render_field(client_form.contact_email, class="form-control", type="email") }}
+                     {{ render_field(client_form.contact_phone, class="form-control", type="tel") }}
+                     <div class="mb-3 form-check">
+                         {{ client_form.is_active(class="form-check-input") }}
+                         {{ client_form.is_active.label(class="form-check-label") }}
+                     </div>
+                 </div>
+             </div>
+         </div>
+         <div class="col-md-6">
+             <div class="card shadow-sm mb-4">
+                 <div class="card-header">
+                     <h5 class="mb-0">Initial Client Admin User Account</h5>
+                 </div>
+                 <div class="card-body">
+                     {{ render_field(user_form.username, class="form-control") }}
+                     {{ render_field(user_form.email, class="form-control", type="email") }}
+                     {{ render_field(user_form.password, class="form-control", type="password") }}
+                     {{ render_field(user_form.confirm_password, class="form-control", type="password") }}
+                 </div>
+             </div>
+         </div>
+     </div>
+     
+     <div class="mt-3">
+         {# Use user_form.submit_user if you want separate submits, or a single submit button #}
+         <button type="submit" class="btn btn-primary"><i class="bi bi-save-fill"></i> Create Client & Admin User</button>
+         <a href="{{ url_for('admin.list_clients') }}" class="btn btn-secondary">Cancel</a>
+     </div>
+ </form>
+ {% endblock %} 

@@ -1,0 +1,70 @@
+{% macro render_field(field, class="form-control", help_text=None, extra_attrs=None) %}
+    <div class="mb-3">
+        {{ field.label(class="form-label") }}
+        
+        {% set field_class = class + (" is-invalid" if field.errors else "") %}
+        
+        {# Merge extra_attrs and kwargs into a single dict #}
+        {% set attrs = {} %}
+        {% if extra_attrs %}
+            {% for key, value in extra_attrs.items() %}
+                {% set _ = attrs.update({key: value}) %}
+            {% endfor %}
+        {% endif %}
+        {% if kwargs %}
+            {% for key, value in kwargs.items() %}
+                {% set _ = attrs.update({key: value}) %}
+            {% endfor %}
+        {% endif %}
+        
+        {# Pass the merged attrs as a single argument #}
+        {% if attrs %}
+            {{ field(class=field_class, **attrs) }}
+        {% else %}
+            {{ field(class=field_class) }}
+        {% endif %}
+
+        {% if field.errors %}
+            <div class="invalid-feedback">
+                {% for error in field.errors %}<span>{{ error }}</span>{% endfor %}
+            </div>
+        {% endif %}
+        {% if help_text %}
+            <small class="form-text text-muted">{{ help_text }}</small>
+        {% endif %}
+    </div>
+{% endmacro %}
+
+{% macro render_select_field(field, class="form-select", help_text=None) %}
+<div class="mb-3">
+    {{ field.label(class="form-label") }}
+    {{ field(class=class + (" is-invalid" if field.errors else "")) }}
+    {% if field.errors %}
+        <div class="invalid-feedback">
+            {% for error in field.errors %}<span>{{ error }}</span>{% endfor %}
+        </div>
+    {% endif %}
+    {% if help_text %}
+        <small class="form-text text-muted">{{ help_text }}</small>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% macro render_checkbox_field(field, class="form-check-input") %}
+<div class="mb-3 form-check">
+    {% set field_class = class + (" is-invalid" if field.errors else "") %}
+    
+    {% if kwargs %}
+        {{ field(class=field_class, **kwargs) }}
+    {% else %}
+        {{ field(class=field_class) }}
+    {% endif %}
+    
+    {{ field.label(class="form-check-label") }}
+    {% if field.errors %}
+        <div class="invalid-feedback d-block"> {# d-block for checkbox errors #}
+            {% for error in field.errors %}<span>{{ error }}</span>{% endfor %}
+        </div>
+    {% endif %}
+</div>
+{% endmacro %} 

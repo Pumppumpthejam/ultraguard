@@ -1,0 +1,48 @@
+{% extends "client_portal_base.html" %}
+
+{% block page_header %}My Checkpoints{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="fas fa-map-marker-alt me-1"></i>
+                    Checkpoints
+                </div>
+                <div class="card-body">
+                    {% if checkpoints %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Location</th>
+                                        <th>Radius</th>
+                                        <th>Description</th>
+                                        <th>Created</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for checkpoint in checkpoints %}
+                                    <tr>
+                                        <td>{{ checkpoint.name }}</td>
+                                        <td>{{ checkpoint.location }}</td>
+                                        <td>{{ checkpoint.radius }}m</td>
+                                        <td>{{ checkpoint.description }}</td>
+                                        <td>{{ checkpoint.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="text-center">No checkpoints found.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

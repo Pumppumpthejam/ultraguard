@@ -1,0 +1,240 @@
+{% extends "admin_base.html" %}
+{% from "_form_helpers.html" import render_field %}
+{% block title %}{{ title }} - Ultraguard Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <div>
+        <h1 class="h2">{{ title }}</h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Devices</li>
+            </ol>
+        </nav>
+    </div>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        {# Add device button should ideally go to client-specific add page if on a client page #}
+        {% if client %}
+        <a href="{{ url_for('admin.add_client_device', client_id=client.id) }}" class="btn btn-sm btn-outline-primary me-2">
+             <i class="bi bi-plus-circle-fill"></i> Add New Device for {{ client.name }}
+        </a>
+        {% else %}
+         <a href="{{ url_for('admin.add_device') }}" class="btn btn-sm btn-outline-primary me-2">
+            <i class="bi bi-plus-circle-fill"></i> Add New Device
+        </a>
+        {% endif %}
+
+        {# Upload CSV button should ideally go to client-specific upload page if on a client page #}
+         {% if client %}
+         {# The form for CSV upload is already included below, within the client filter logic block #}
+         {% else %}
+          <a href="{{ url_for('admin.upload_devices') }}" class="btn btn-sm btn-outline-info">
+            <i class="bi bi-file-earmark-arrow-up-fill"></i> Upload CSV
+        </a>
+         {% endif %}
+    </div>
+</div>
+
+{# Client Filter and CSV Upload Form (Visible only on global /devices page) #}
+{% if not client %}
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('admin.list_devices') }}" class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label for="client_id" class="form-label">Filter by Client</label>
+                <select name="client_id" id="client_id" class="form-select" onchange="this.form.submit()">
+                    <option value="">All Clients</option>
+                    {% for client_item in clients %}
+                    <option value="{{ client_item.id }}" {% if selected_client_id and selected_client_id|int == client_item.id %}selected{% endif %}>
+                        {{ client_item.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+         {# CSV Upload Form (Only display if not on a client's specific page) #}
+        <div class="mt-4">
+         <form method="POST" action="{{ url_for('admin.upload_devices') }}" enctype="multipart/form-data" class="row g-3 align-items-end" novalidate>
+            {{ csv_upload_form.hidden_tag() if csv_upload_form }}
+             <div class="col-md-6">
+              {{ render_field(csv_upload_form.client_id, class="form-select") if csv_upload_form }}
+             </div>
+            <div class="col-md-6">
+            {{ render_field(csv_upload_form.csv_file, class="form-control") if csv_upload_form }}
+            </div>
+             <div class="col-auto">
+              {{ csv_upload_form.submit_csv(class="btn btn-info") if csv_upload_form }}
+             </div>
+         </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if devices.items %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>IMEI</th>
+                <th>Name</th>
+                <th>Model</th>
+                <th>Client</th>
+                <th>Status</th>
+                <th>Last Seen</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for device in devices.items %}
+            <tr>
+                <td>{{ device.id }}</td>
+                <td>{{ device.imei }}</td>
+                <td>{{ device.name or 'N/A' }}</td>
+                <td>{{ device.model or 'N/A' }}</td>
+                <td>
+                    {% if device.client %}
+                    <a href="{{ url_for('admin.list_devices', client_id=device.client.id) }}">
+                        {{ device.client.name }}
+                    </a>
+                     {% else %}
+                     N/A
+                     {% endif %}
+                </td>
+                <td>
+                    <span class="badge {% if device.status == 'active' %}bg-success{% else %}bg-danger{% endif %}>">
+                        {{ device.status|title }}
+                    </span>
+                </td>
+                <td>{{ device.last_seen.strftime('%Y-%m-%d %H:%M') if device.last_seen else 'Never' }}</td>
+                <td>
+                    <div class="btn-group">
+                        <a href="{{ url_for('admin.edit_device', device_id=device.id) }}" 
+                           class="btn btn-sm btn-outline-secondary me-1" 
+                           title="Edit Device">
+                            <i class="bi bi-pencil-fill"></i>
+                        </a>
+                        {# Add Delete Button #}
+                        <button type="button" class="btn btn-sm btn-outline-danger" title="Delete Device"
+                                onclick="confirmDeviceDeleteModal('{{ device.id }}', '{{ device.imei }}', '{{ device.name or 'Device' }}')">
+                            <i class="bi bi-trash-fill"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{# Pagination #}
+<nav aria-label="Device list pagination">
+    <ul class="pagination justify-content-center">
+        {% if devices.has_prev %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('admin.list_devices', page=devices.prev_num, client_id=selected_client_id) }}">
+                Previous
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">Previous</span>
+        </li>
+        {% endif %}
+
+        {% for page_num in devices.iter_pages(left_edge=2, left_current=2, right_current=3, right_edge=2) %}
+            {% if page_num %}
+                {% if page_num == devices.page %}
+                <li class="page-item active">
+                    <span class="page-link">{{ page_num }}</span>
+                </li>
+                {% else %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.list_devices', page=page_num, client_id=selected_client_id) }}">
+                        {{ page_num }}
+                    </a>
+                </li>
+                {% endif %}
+            {% else %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+            {% endif %}
+        {% endfor %}
+
+        {% if devices.has_next %}
+        <li class="page-item">
+            <a class="page-link" href="{{ url_for('admin.list_devices', page=devices.next_num, client_id=selected_client_id) }}">
+                Next
+            </a>
+        </li>
+        {% else %}
+        <li class="page-item disabled">
+            <span class="page-link">Next</span>
+        </li>
+        {% endif %}
+    </ul>
+</nav>
+{% else %}
+<div class="alert alert-info mt-3" role="alert">
+    No devices found. 
+    {% if client %}
+         No devices found for {{ client.name }}. <a href="{{ url_for('admin.add_client_device', client_id=client.id) }}" class="alert-link">Add the first device for this client now!</a>
+     {% elif selected_client_id %}
+        No devices found for the selected client.
+    {% else %}
+        No devices found in the system. <a href="{{ url_for('admin.add_device') }}" class="alert-link">Add the first device now!</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{# Hidden Delete Form & Modal (Bootstrap 5) #}
+<form method="POST" action="" id="deleteDeviceForm" style="display: none;">
+    {{ delete_form.hidden_tag() if delete_form }} {# CSRF token from the passed delete_form #}
+</form>
+
+<div class="modal fade" id="confirmDeleteDeviceModal" tabindex="-1" aria-labelledby="confirmDeleteDeviceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmDeleteDeviceModalLabel">Confirm Device Dletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete device <strong id="deviceToDeleteName"></strong> (IMEI: <strong id="deviceToDeleteIMEI"></strong>)? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="document.getElementById('deleteDeviceForm').submit();">Delete Device</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+function confirmDeviceDeleteModal(deviceId, deviceIMEI, deviceName) {
+    // Set the action URL for the hidden delete form
+    const deleteForm = document.getElementById('deleteDeviceForm');
+    if (deleteForm) {
+        // Construct the URL using a placeholder and replace it.
+        // This assumes 'admin.delete_device' is your delete route endpoint.
+        let actionUrl = "{{ url_for('admin.delete_device', device_id=0) }}"; 
+        deleteForm.action = actionUrl.replace('0', deviceId);
+    }
+
+    // Update modal content
+    document.getElementById('deviceToDeleteName').textContent = deviceName;
+    document.getElementById('deviceToDeleteIMEI').textContent = deviceIMEI;
+
+    // Show the modal
+    var myModal = new bootstrap.Modal(document.getElementById('confirmDeleteDeviceModal'));
+    myModal.show();
+}
+</script>
+{% endblock %} 

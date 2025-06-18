@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: ultraguard-postgres
+    environment:
+      POSTGRES_USER: ultraguard_user
+      POSTGRES_PASSWORD: ym8SYnibDvkEGMAs7WJJVw
+      POSTGRES_DB: ultraguard_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - ultraguard-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ultraguard_user -d ultraguard_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  ultraguard-pgdata:
+    name: ultraguard-pgdata 

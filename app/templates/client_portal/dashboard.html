@@ -1,0 +1,134 @@
+{% extends "client_portal_base.html" %}
+
+{% block title %}Test Client Company Dashboard{% endblock %}
+
+{% block page_header %}Test Client Company Dashboard{% endblock %}
+
+{% block content %}
+<p class="lead">Welcome to your portal, {{ current_user.username }}!</p>
+<p>Manage your sites, patrols, devices, and reports from here.</p>
+
+<div class="row mt-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            My Sites</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ num_sites if num_sites is defined else 'N/A' }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-pin-map-fill fs-2 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            My Devices</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ num_devices if num_devices is defined else 'N/A' }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-hdd-stack-fill fs-2 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            My Routes</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ num_routes if num_routes is defined else 'N/A' }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-signpost-split-fill fs-2 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            My Checkpoints</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ num_checkpoints if num_checkpoints is defined else 'N/A' }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-geo-alt-fill fs-2 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-info shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                            Total Shifts</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ num_total_shifts if num_total_shifts is defined else 'N/A' }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-calendar-week-fill fs-2 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-warning shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                            Patrol Reports</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ num_reports if num_reports is defined else 'N/A' }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-file-text-fill fs-2 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Quick Actions</h5>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('client_portal.upload_patrol_report') }}" class="btn btn-primary">
+                        <i class="bi bi-file-earmark-arrow-up-fill"></i> Upload Patrol Report
+                    </a>
+                    <a href="{{ url_for('client_portal.list_uploaded_reports') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-file-text-fill"></i> View Reports
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

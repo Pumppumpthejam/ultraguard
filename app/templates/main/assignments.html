@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Patrol Assignments - Ultraguard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Patrol Assignment Management</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('main.add_assignment') }}" class="btn btn-sm btn-outline-primary">Add New Assignment</a>
+    </div>
+</div>
+
+{% if assignments %}
+<div class="table-responsive">
+    <table class="table table-striped table-sm">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Guard</th>
+                <th>Route</th>
+                <th>Scheduled Date</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for assignment in assignments %}
+            <tr>
+                <td>{{ assignment.id }}</td>
+                <td>{{ assignment.guard.username if assignment.guard else 'N/A' }}</td>
+                <td>{{ assignment.assigned_route.name if assignment.assigned_route else 'N/A' }}</td>
+                <td>{{ assignment.scheduled_date.strftime('%Y-%m-%d') }}</td>
+                <td>{{ assignment.scheduled_start_time.strftime('%H:%M') }}</td>
+                <td>{{ assignment.scheduled_end_time.strftime('%H:%M') }}</td>
+                <td>
+                    <!-- Edit/Delete buttons later -->
+                    <!-- <a href="{{ url_for('main.edit_assignment', assignment_id=assignment.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a> -->
+                     <a href="{{ url_for('main.upload_report_form', assignment_id_preselect=assignment.id) }}" class="btn btn-sm btn-info">Upload Report</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>No patrol assignments found. <a href="{{ url_for('main.add_assignment') }}">Add one now.</a></p>
+{% endif %}
+{% endblock %} 

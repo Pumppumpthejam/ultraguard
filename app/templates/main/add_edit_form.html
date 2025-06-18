@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_form_helpers.html" import render_field %}
+
+{% block title %}{{ title }} - Ultraguard{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <h2 class="mt-4 mb-4">{{ form_title }}</h2>
+        <form method="POST" action="" novalidate>
+            {{ form.hidden_tag() }} <!-- CSRF token -->
+
+            {% for field in form if field.widget.input_type != 'hidden' and field.type != 'SubmitField' %}
+                {{ render_field(field, class="form-control") }}
+            {% endfor %}
+
+            <div class="d-grid gap-2">
+                {{ form.submit(class="btn btn-primary btn-lg") }}
+            </div>
+            <p class="mt-3">
+                <a href="{{ request.referrer or url_for('main.index') }}">Cancel</a>
+            </p>
+        </form>
+    </div>
+</div>
+{% endblock %} 

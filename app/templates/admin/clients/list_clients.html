@@ -1,0 +1,90 @@
+{% extends "admin_base.html" %}
+{% block title %}{{ title }} - Ultraguard Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ title }}</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('admin.add_client') }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-plus-circle-fill"></i> Add New Client
+        </a>
+    </div>
+</div>
+
+{% if clients.items %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Client Name</th>
+                <th>Contact Person</th>
+                <th>Contact Email</th>
+                <th>Status</th>
+                <th>Created At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for client in clients.items %}
+            <tr>
+                <td>{{ client.id }}</td>
+                <td>{{ client.name }}</td>
+                <td>{{ client.contact_person or 'N/A' }}</td>
+                <td>{{ client.contact_email or 'N/A' }}</td>
+                <td>
+                    {% if client.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-danger">Inactive</span>
+                    {% endif %}
+                </td>
+                <td>{{ client.created_at.strftime('%Y-%m-%d %H:%M') if client.created_at else 'N/A' }}</td>
+                <td>
+                    <a href="{{ url_for('admin.edit_client', client_id=client.id) }}" class="btn btn-sm btn-outline-secondary me-1" title="Edit Client Details">
+                        <i class="bi bi-pencil-fill"></i>
+                    </a>
+                    <a href="{{ url_for('admin.list_client_devices', client_id=client.id) }}" class="btn btn-sm btn-outline-info" title="Manage Devices for {{ client.name }}">
+                        <i class="bi bi-hdd-stack-fill"></i> Devices ({{ client.devices.count() }})
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{# Pagination #}
+<nav aria-label="Client list navigation">
+    <ul class="pagination justify-content-center">
+        {% if clients.has_prev %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('admin.list_clients', page=clients.prev_num) }}">Previous</a></li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">Previous</span></li>
+        {% endif %}
+
+        {% for page_num in clients.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+            {% if page_num %}
+                {% if clients.page == page_num %}
+                    <li class="page-item active"><span class="page-link">{{ page_num }}</span></li>
+                {% else %}
+                    <li class="page-item"><a class="page-link" href="{{ url_for('admin.list_clients', page=page_num) }}">{{ page_num }}</a></li>
+                {% endif %}
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">...</span></li>
+            {% endif %}
+        {% endfor %}
+
+        {% if clients.has_next %}
+            <li class="page-item"><a class="page-link" href="{{ url_for('admin.list_clients', page=clients.next_num) }}">Next</a></li>
+        {% else %}
+            <li class="page-item disabled"><span class="page-link">Next</span></li>
+        {% endif %}
+    </ul>
+</nav>
+{% else %}
+<div class="alert alert-info mt-3" role="alert">
+    No clients found. <a href="{{ url_for('admin.add_client') }}" class="alert-link">Add the first client now!</a>
+</div>
+{% endif %}
+{% endblock %} 

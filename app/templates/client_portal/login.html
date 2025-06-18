@@ -1,0 +1,41 @@
+{% extends "auth_base.html" %}
+{% from "_form_helpers.html" import render_field %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="col-md-6 col-lg-5 col-xl-4 mx-auto">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+    <div class="card shadow-lg border-0 rounded-lg mt-5">
+        <div class="card-header bg-primary text-white">
+            <h3 class="text-center font-weight-light my-3">{{ title }}</h3>
+        </div>
+        <div class="card-body p-4">
+            <form method="POST" action="{{ url_for('client_portal.login', next=request.args.get('next')) }}" novalidate>
+                {{ form.hidden_tag() }}
+                
+                {{ render_field(form.username_or_email, class="form-control form-control-lg", placeholder="Username or Email", autofocus=True) }}
+                {{ render_field(form.password, class="form-control form-control-lg", type="password", placeholder="Password") }}
+                
+                <div class="form-check mb-3">
+                    {{ form.remember_me(class="form-check-input") }}
+                    {{ form.remember_me.label(class="form-check-label") }}
+                </div>
+                
+                <div class="d-grid mt-4 mb-0">
+                    {{ form.submit(class="btn btn-primary btn-lg w-100") }}
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

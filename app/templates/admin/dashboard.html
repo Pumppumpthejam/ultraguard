@@ -1,0 +1,47 @@
+{% extends "admin_base.html" %}
+{% block title %}{{ title }} - Ultraguard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">{{ title }}</h1>
+</div>
+<p class="lead">Welcome to the Ultraguard Admin Dashboard, {{ current_user.username }}!</p>
+<p>From here you can manage clients, their devices, system users, and oversee operations.</p>
+
+<div class="row mt-4">
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-primary shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                            Total Clients</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ num_clients if num_clients is defined else 'N/A' }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-briefcase-fill fs-2 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card border-left-success shadow h-100 py-2">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                            Total Devices</div>
+                        <div class="h5 mb-0 font-weight-bold text-gray-800">{{ num_devices if num_devices is defined else 'N/A' }}</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="bi bi-hdd-stack-fill fs-2 text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {# Add more dashboard cards as needed #}
+</div>
+{% endblock %} 

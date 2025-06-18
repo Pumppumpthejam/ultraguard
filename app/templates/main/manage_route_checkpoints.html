@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% from "_form_helpers.html" import render_field %}
+
+{% block title %}{{ title }} - Ultraguard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-5">
+        <h2 class="mt-4 mb-4">{{ form_title }}</h2>
+        <form method="POST" action="{{ url_for('main.edit_route', route_id=route.id) }}" novalidate>
+            {{ form.hidden_tag() }}
+            {{ render_field(form.name, class="form-control") }}
+            {{ render_field(form.description, class="form-control", rows=3) }}
+            {{ form.submit(class="btn btn-primary") }}
+            <a href="{{ url_for('main.list_routes') }}" class="btn btn-secondary">Back to Routes List</a>
+        </form>
+    </div>
+
+    <div class="col-md-7">
+        <h3 class="mt-4 mb-4">Checkpoints in this Route (Ordered)</h3>
+        {% if assigned_route_checkpoints %}
+        <ul class="list-group mb-3">
+            {% for rc in assigned_route_checkpoints %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>{{ rc.sequence_order }}. {{ rc.checkpoint.name }}</strong>
+                    {% if rc.expected_time_window_start or rc.expected_time_window_end %}
+                        <small class="text-muted d-block">
+                            Expected:
+                            {{ rc.expected_time_window_start.strftime('%H:%M') if rc.expected_time_window_start else 'Any' }} -
+                            {{ rc.expected_time_window_end.strftime('%H:%M') if rc.expected_time_window_end else 'Any' }}
+                        </small>
+                    {% endif %}
+                </div>
+                <form method="POST" action="{{ url_for('main.remove_checkpoint_from_route', rc_id=rc.id) }}" style="display: inline;">
+                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to remove this checkpoint from the route?');">Remove</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>No checkpoints assigned to this route yet.</p>
+        {% endif %}
+
+        <h4 class="mb-3">Add Checkpoint to Route</h4>
+        <form method="POST" action="{{ url_for('main.add_checkpoint_to_route', route_id=route.id) }}">
+            <div class="row g-3 align-items-end">
+                <div class="col-sm-5">
+                    <label for="checkpoint_id" class="form-label">Select Checkpoint:</label>
+                    <select name="checkpoint_id" id="checkpoint_id" class="form-select">
+                        <option value="">--- Select ---</option>
+                        {% for cp in available_checkpoints %}
+                        <option value="{{ cp.id }}">{{ cp.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-3">
+                     <label for="expected_time_window_start" class="form-label">Start (HH:MM)</label>
+                     <input type="time" name="expected_time_window_start" id="expected_time_window_start" class="form-control">
+                </div>
+                <div class="col-sm-3">
+                    <label for="expected_time_window_end" class="form-label">End (HH:MM)</label>
+                    <input type="time" name="expected_time_window_end" id="expected_time_window_end" class="form-control">
+                </div>
+                <div class="col-sm-1">
+                    <button type="submit" class="btn btn-success">Add</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+    // Basic JS for reordering could be added here later for better UX
+</script>
+{% endblock %} 

@@ -1,0 +1,42 @@
+{% extends "client_portal_base.html" %}
+{% from "_form_helpers.html" import render_field %}
+
+{% block title %}{{ action }} Site - {{ current_user.client.name }}{% endblock %}
+
+{% block page_header %}{{ action }} Site{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="POST" action="" novalidate>
+                    {{ form.hidden_tag() }}
+                    {{ render_field(form.name, class="form-control") }}
+                    {{ render_field(form.address, class="form-control", rows=3) }}
+                    {{ render_field(form.description, class="form-control", rows=4) }}
+                    <div class="mt-4">
+                        {{ form.submit(class="btn btn-primary") }}
+                        <a href="{{ url_for('client_portal.list_sites') }}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Instructions</h5>
+                <p class="card-text">
+                    <ul class="mb-0">
+                        <li>Site name should be unique within your organization</li>
+                        <li>Provide a complete address for accurate location tracking</li>
+                        <li>Add any relevant details in the description field</li>
+                    </ul>
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

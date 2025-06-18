@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Checkpoints - Ultraguard{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Checkpoint Management</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('main.add_checkpoint') }}" class="btn btn-sm btn-outline-primary">Add New Checkpoint</a>
+    </div>
+</div>
+
+{% if checkpoints %}
+<div class="table-responsive">
+    <table class="table table-striped table-sm">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
+                <th>Radius (m)</th>
+                <th>Description</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for checkpoint in checkpoints %}
+            <tr>
+                <td>{{ checkpoint.id }}</td>
+                <td>{{ checkpoint.name }}</td>
+                <td>{{ checkpoint.latitude }}</td>
+                <td>{{ checkpoint.longitude }}</td>
+                <td>{{ checkpoint.radius }}</td>
+                <td>{{ checkpoint.description|truncate(50, True) if checkpoint.description else '' }}</td>
+                <td>
+                    <a href="{{ url_for('main.edit_checkpoint', checkpoint_id=checkpoint.id) }}" class="btn btn-sm btn-outline-secondary">Edit</a>
+                    <!-- Delete button with confirmation later -->
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>No checkpoints found. <a href="{{ url_for('main.add_checkpoint') }}">Add one now.</a></p>
+{% endif %}
+{% endblock %} 
