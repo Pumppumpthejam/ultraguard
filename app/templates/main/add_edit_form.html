@@ -18,7 +18,7 @@
                 {{ form.submit(class="btn btn-primary btn-lg") }}
             </div>
             <p class="mt-3">
-                <a href="{{ request.referrer or url_for('main.index') }}">Cancel</a>
+                <a href="{{ request.referrer or '#' }}">Cancel</a>
             </p>
         </form>
     </div>

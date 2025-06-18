@@ -1,11 +1,13 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
 from flask_login import login_user, logout_user, login_required, current_user
-from urllib.parse import urlparse
+from werkzeug.urls import urlparse
+from datetime import datetime, timezone
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy import text, select, or_
 from app import db, login_manager
 from app.client_portal import bp
 from app.models import User, Client, Site, Checkpoint, Route, Shift, Device, UploadedPatrolReport, RouteCheckpoint
 from app.client_portal.forms import ClientLoginForm, SiteForm, PatrolReportUploadForm, CheckpointForm, RouteForm, ShiftForm
-from datetime import datetime, timezone
 from app.exceptions import (
     FileUploadError, InvalidFileTypeError, CSVValidationError,
     DeviceIdentifierMismatchError, VerificationLogicError
@@ -13,7 +15,6 @@ from app.exceptions import (
 from app.utils.file_handlers import save_uploaded_file, validate_csv_structure, read_csv_data
 from app.utils.verification import verify_patrol_report
 from app.utils.report_processing import handle_report_submission_and_processing
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -35,23 +36,61 @@ def login():
         try:
             # Debug: Test basic database connection
             current_app.logger.info("Testing database connection...")
-            test_query = User.query.first()
-            current_app.logger.info(f"Database connection test successful. Found user: {test_query.username if test_query else 'None'}")
+            db.engine.execute(text("SELECT 1"))
+            current_app.logger.info("✅ Database connection successful!")
             
-            # Debug: Test simple query first
-            current_app.logger.info("Testing simple username query...")
-            username_test = User.query.filter(User.username == form.username_or_email.data.strip()).first()
-            current_app.logger.info(f"Username query result: {username_test.username if username_test else 'None'}")
+            # Debug: Test raw SQL query first
+            current_app.logger.info("Testing raw SQL query...")
+            try:
+                raw_sql_test = db.session.execute(text("SELECT id, username FROM system_user LIMIT 1")).first()
+                if raw_sql_test:
+                    current_app.logger.info(f"✅ RAW SQL TEST SUCCESS: Fetched user ID {raw_sql_test[0]}, username {raw_sql_test[1]}")
+                else:
+                    current_app.logger.info("✅ RAW SQL TEST: No users found, but query executed successfully.")
+            except Exception as e_raw:
+                current_app.logger.error(f"❌ RAW SQL TEST FAILED: {e_raw}", exc_info=True)
+                flash('Database query error. Please try again.', 'danger')
+                return redirect(url_for('client_portal.login'))
             
-            # Original query with error handling
-            current_app.logger.info("Testing combined username/email query...")
-            user = User.query.filter(
-                (User.username == form.username_or_email.data.strip()) | 
-                (User.email == form.username_or_email.data.strip())
-            ).first()
+            # Debug: Test simple SQLAlchemy query
+            current_app.logger.info("Testing simple SQLAlchemy query...")
+            try:
+                test_query = User.query.first()
+                current_app.logger.info(f"✅ Simple SQLAlchemy query successful. Found user: {test_query.username if test_query else 'None'}")
+            except Exception as e_simple:
+                current_app.logger.error(f"❌ Simple SQLAlchemy query failed: {e_simple}", exc_info=True)
+                flash('Database query error. Please try again.', 'danger')
+                return redirect(url_for('client_portal.login'))
+            
+            # Debug: Test SQLAlchemy 2.0 style query
+            current_app.logger.info("Testing SQLAlchemy 2.0 style query...")
+            try:
+                username_or_email_val = form.username_or_email.data.strip()
+                stmt = select(User).where(
+                    or_(
+                        User.username == username_or_email_val,
+                        User.email == username_or_email_val
+                    )
+                )
+                user = db.session.execute(stmt).scalar_one_or_none()
+                current_app.logger.info(f"✅ SQLAlchemy 2.0 query successful. Found user: {user.username if user else 'None'}")
+            except Exception as e_modern:
+                current_app.logger.error(f"❌ SQLAlchemy 2.0 query failed: {e_modern}", exc_info=True)
+                # Fall back to legacy style
+                current_app.logger.info("Falling back to legacy SQLAlchemy query...")
+                try:
+                    user = User.query.filter(
+                        (User.username == form.username_or_email.data.strip()) | 
+                        (User.email == form.username_or_email.data.strip())
+                    ).first()
+                    current_app.logger.info(f"✅ Legacy query successful. Found user: {user.username if user else 'None'}")
+                except Exception as e_legacy:
+                    current_app.logger.error(f"❌ Legacy query also failed: {e_legacy}", exc_info=True)
+                    flash('Database query error. Please try again.', 'danger')
+                    return redirect(url_for('client_portal.login'))
             
         except Exception as e:
-            current_app.logger.error(f"Database query error: {e}", exc_info=True)
+            current_app.logger.error(f"❌ Database connection failed: {e}", exc_info=True)
             flash('Database connection error. Please try again.', 'danger')
             return redirect(url_for('client_portal.login'))
         
