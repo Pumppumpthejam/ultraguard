@@ -118,22 +118,8 @@ def create_app(config_name: str):
                     
                     # Create initial data if no users exist
                     if User.query.count() == 0:
-                        app.logger.info("🔄 Creating initial data...")
+                        app.logger.info("🔄 Creating initial Ultraguard admin user...")
                         from werkzeug.security import generate_password_hash
-                        
-                        # Create a test client
-                        from .models import Client
-                        test_client = Client(
-                            name="Test Client Company",
-                            contact_person="Test Contact",
-                            contact_email="test@example.com",
-                            contact_phone="+1234567890",
-                            is_active=True
-                        )
-                        db.session.add(test_client)
-                        db.session.flush()
-                        
-                        # Create test users
                         admin_user = User(
                             username="admin",
                             email="admin@ultraguard.com",
@@ -142,30 +128,9 @@ def create_app(config_name: str):
                             is_active=True
                         )
                         db.session.add(admin_user)
-                        
-                        client_admin = User(
-                            username="client_admin",
-                            email="admin@testclient.com",
-                            password_hash=generate_password_hash("client123"),
-                            role="CLIENT_ADMIN",
-                            client_id=test_client.id,
-                            is_active=True
-                        )
-                        db.session.add(client_admin)
-                        
-                        client_staff = User(
-                            username="client_staff",
-                            email="staff@testclient.com",
-                            password_hash=generate_password_hash("staff123"),
-                            role="CLIENT_STAFF",
-                            client_id=test_client.id,
-                            is_active=True
-                        )
-                        db.session.add(client_staff)
-                        
                         db.session.commit()
-                        app.logger.info("✅ Initial data created successfully!")
-                        app.logger.info("📋 Test credentials: client_admin/client123, client_staff/staff123, admin/admin123")
+                        app.logger.info("✅ Initial Ultraguard admin user created!")
+                        app.logger.info("📋 Admin credentials: admin / admin123")
                         
                 except Exception as create_error:
                     app.logger.error(f"❌ Failed to create tables: {create_error}", exc_info=True)
