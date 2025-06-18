@@ -6,7 +6,6 @@ services:
     buildCommand: |
       apt-get update && apt-get install -y libpq-dev gcc python3-dev
       pip install -r requirements.txt
-      python init_db.py
     startCommand: gunicorn run:app
     envVars:
       - key: PYTHON_VERSION

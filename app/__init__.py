@@ -9,6 +9,7 @@ from config import config_by_name  # <-- Import the config_by_name dictionary
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timezone
+from sqlalchemy import text
 
 db = SQLAlchemy() # Initialize SQLAlchemy extension
 migrate = Migrate() # Initialize Flask-Migrate
@@ -94,6 +95,82 @@ def create_app(config_name: str):
 
         # Ensure models are known to SQLAlchemy
         from . import models
+        
+        # Test database connection and create tables if needed
+        try:
+            app.logger.info("Testing database connection...")
+            db.engine.execute(text("SELECT 1"))
+            app.logger.info("✅ Database connection successful!")
+            
+            # Check if tables exist and create them if needed
+            try:
+                from .models import User
+                user_count = User.query.count()
+                app.logger.info(f"✅ Database tables exist. Found {user_count} users.")
+            except Exception as table_error:
+                app.logger.warning(f"⚠️  Database tables may not exist yet: {table_error}")
+                app.logger.info("🔄 Creating database tables...")
+                try:
+                    db.create_all()
+                    app.logger.info("✅ Database tables created successfully!")
+                    
+                    # Create initial data if no users exist
+                    if User.query.count() == 0:
+                        app.logger.info("🔄 Creating initial data...")
+                        from werkzeug.security import generate_password_hash
+                        
+                        # Create a test client
+                        from .models import Client
+                        test_client = Client(
+                            name="Test Client Company",
+                            contact_person="Test Contact",
+                            contact_email="test@example.com",
+                            contact_phone="+1234567890",
+                            is_active=True
+                        )
+                        db.session.add(test_client)
+                        db.session.flush()
+                        
+                        # Create test users
+                        admin_user = User(
+                            username="admin",
+                            email="admin@ultraguard.com",
+                            password_hash=generate_password_hash("admin123"),
+                            role="ULTRAGUARD_ADMIN",
+                            is_active=True
+                        )
+                        db.session.add(admin_user)
+                        
+                        client_admin = User(
+                            username="client_admin",
+                            email="admin@testclient.com",
+                            password_hash=generate_password_hash("client123"),
+                            role="CLIENT_ADMIN",
+                            client_id=test_client.id,
+                            is_active=True
+                        )
+                        db.session.add(client_admin)
+                        
+                        client_staff = User(
+                            username="client_staff",
+                            email="staff@testclient.com",
+                            password_hash=generate_password_hash("staff123"),
+                            role="CLIENT_STAFF",
+                            client_id=test_client.id,
+                            is_active=True
+                        )
+                        db.session.add(client_staff)
+                        
+                        db.session.commit()
+                        app.logger.info("✅ Initial data created successfully!")
+                        app.logger.info("📋 Test credentials: client_admin/client123, client_staff/staff123, admin/admin123")
+                        
+                except Exception as create_error:
+                    app.logger.error(f"❌ Failed to create tables: {create_error}", exc_info=True)
+                
+        except Exception as db_error:
+            app.logger.error(f"❌ Database connection failed: {db_error}")
+            app.logger.error("Please check your DATABASE_URL environment variable.")
 
     # Add root route redirect
     @app.route('/')
