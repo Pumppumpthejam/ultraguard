@@ -32,10 +32,28 @@ def login():
     
     form = ClientLoginForm()
     if form.validate_on_submit():
-        user = User.query.filter(
-            (User.username == form.username_or_email.data) | 
-            (User.email == form.username_or_email.data)
-        ).first()
+        try:
+            # Debug: Test basic database connection
+            current_app.logger.info("Testing database connection...")
+            test_query = User.query.first()
+            current_app.logger.info(f"Database connection test successful. Found user: {test_query.username if test_query else 'None'}")
+            
+            # Debug: Test simple query first
+            current_app.logger.info("Testing simple username query...")
+            username_test = User.query.filter(User.username == form.username_or_email.data.strip()).first()
+            current_app.logger.info(f"Username query result: {username_test.username if username_test else 'None'}")
+            
+            # Original query with error handling
+            current_app.logger.info("Testing combined username/email query...")
+            user = User.query.filter(
+                (User.username == form.username_or_email.data.strip()) | 
+                (User.email == form.username_or_email.data.strip())
+            ).first()
+            
+        except Exception as e:
+            current_app.logger.error(f"Database query error: {e}", exc_info=True)
+            flash('Database connection error. Please try again.', 'danger')
+            return redirect(url_for('client_portal.login'))
         
         if user is None or not user.check_password(form.password.data):
             flash('Invalid username/email or password', 'danger')
