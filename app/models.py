@@ -25,7 +25,7 @@ class Client(db.Model):
         return f'<Client {self.name}>'
 
 class User(db.Model, UserMixin): # For both Ultraguard Admins and Client Users
-    __tablename__ = 'system_user'
+    __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True) # Required by UserMixin
     username = db.Column(db.String(80), unique=True, nullable=False) # Login username
     password_hash = db.Column(db.String(256), nullable=False)
@@ -179,7 +179,7 @@ class UploadedPatrolReport(db.Model):
     __tablename__ = 'uploaded_patrol_report'
     id = db.Column(db.Integer, primary_key=True)
     shift_id = db.Column(db.Integer, db.ForeignKey('shift.id'), nullable=False)
-    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey('system_user.id'), nullable=True)
+    uploaded_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     
     # File handling fields
     filename = db.Column(db.String(255), nullable=False)  # Original filename

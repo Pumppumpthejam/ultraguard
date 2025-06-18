@@ -44,7 +44,7 @@ def login():
             # Debug: Test raw SQL query first
             current_app.logger.info("Testing raw SQL query...")
             try:
-                raw_sql_test = db.session.execute(text("SELECT id, username FROM system_user LIMIT 1")).first()
+                raw_sql_test = db.session.execute(text("SELECT id, username FROM users LIMIT 1")).first()
                 if raw_sql_test:
                     current_app.logger.info(f"✅ RAW SQL TEST SUCCESS: Fetched user ID {raw_sql_test[0]}, username {raw_sql_test[1]}")
                 else:
