@@ -115,25 +115,24 @@ def create_app(config_name: str):
                 try:
                     db.create_all()
                     app.logger.info("✅ Database tables created successfully!")
-                    
-                    # Create initial data if no users exist
-                    if User.query.count() == 0:
-                        app.logger.info("🔄 Creating initial Ultraguard admin user...")
-                        from werkzeug.security import generate_password_hash
-                        admin_user = User(
-                            username="admin",
-                            email="admin@ultraguard.com",
-                            password_hash=generate_password_hash("admin123"),
-                            role="ULTRAGUARD_ADMIN",
-                            is_active=True
-                        )
-                        db.session.add(admin_user)
-                        db.session.commit()
-                        app.logger.info("✅ Initial Ultraguard admin user created!")
-                        app.logger.info("📋 Admin credentials: admin / admin123")
-                        
                 except Exception as create_error:
                     app.logger.error(f"❌ Failed to create tables: {create_error}", exc_info=True)
+            # Always check if admin user needs to be created
+            from .models import User
+            if User.query.count() == 0:
+                app.logger.info("🔄 Creating initial Ultraguard admin user...")
+                from werkzeug.security import generate_password_hash
+                admin_user = User(
+                    username="admin",
+                    email="admin@ultraguard.com",
+                    password_hash=generate_password_hash("admin123"),
+                    role="ULTRAGUARD_ADMIN",
+                    is_active=True
+                )
+                db.session.add(admin_user)
+                db.session.commit()
+                app.logger.info("✅ Initial Ultraguard admin user created!")
+                app.logger.info("📋 Admin credentials: admin / admin123")
                 
         except Exception as db_error:
             app.logger.error(f"❌ Database connection failed: {db_error}")
