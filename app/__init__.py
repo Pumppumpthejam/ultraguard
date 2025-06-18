@@ -99,7 +99,9 @@ def create_app(config_name: str):
         # Test database connection and create tables if needed
         try:
             app.logger.info("Testing database connection...")
-            db.engine.execute(text("SELECT 1"))
+            with db.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+                conn.commit()
             app.logger.info("✅ Database connection successful!")
             
             # Check if tables exist and create them if needed

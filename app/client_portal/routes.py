@@ -36,7 +36,9 @@ def login():
         try:
             # Debug: Test basic database connection
             current_app.logger.info("Testing database connection...")
-            db.engine.execute(text("SELECT 1"))
+            with db.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+                conn.commit()
             current_app.logger.info("✅ Database connection successful!")
             
             # Debug: Test raw SQL query first
