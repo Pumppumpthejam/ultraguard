@@ -1,0 +1,40 @@
+{% extends "client_portal_base.html" %}
+{% from "_form_helpers.html" import render_field, render_textarea_field %}
+
+{% block title %}{{ title }} - Ultraguard{% endblock %}
+
+{% block page_header %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="POST" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    {{ render_field(form.name, class="form-control", placeholder="e.g., Main Entrance, North Fence") }}
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ render_field(form.latitude, class="form-control", placeholder="e.g., 34.052235") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ render_field(form.longitude, class="form-control", placeholder="e.g., -118.243683") }}
+                        </div>
+                    </div>
+
+                    {{ render_field(form.radius, class="form-control", placeholder="e.g., 20") }}
+                    
+                    {{ render_textarea_field(form.description, class="form-control", rows="4", placeholder="Optional: Any specific instructions for this checkpoint.") }}
+
+                    <div class="mt-4">
+                        {{ form.submit(class="btn btn-primary", value=form_action_label) }}
+                        <a href="{{ url_for('client_portal.list_checkpoints') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

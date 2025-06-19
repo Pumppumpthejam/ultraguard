@@ -1,53 +1,53 @@
 {% extends "client_portal_base.html" %}
 
+{% block title %}My Checkpoints - Ultraguard{% endblock %}
+
 {% block page_header %}My Checkpoints{% endblock %}
 
+{% block page_actions %}
+    <a href="{{ url_for('client_portal.add_checkpoint') }}" class="btn btn-success">
+        <i class="bi bi-plus-circle-fill"></i> Add New Checkpoint
+    </a>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid px-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <i class="fas fa-map-marker-alt me-1"></i>
-                    Checkpoints
-                    <a href="{{ url_for('client_portal.add_checkpoint') }}" class="btn btn-sm btn-success float-end">+ Add Checkpoint</a>
-                </div>
-                <div class="card-body">
-                    {% if checkpoints %}
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Location</th>
-                                        <th>Radius</th>
-                                        <th>Description</th>
-                                        <th>Created</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for checkpoint in checkpoints %}
-                                    <tr>
-                                        <td>{{ checkpoint.name }}</td>
-                                        <td>{{ checkpoint.location }}</td>
-                                        <td>{{ checkpoint.radius }}m</td>
-                                        <td>{{ checkpoint.description }}</td>
-                                        <td>{{ checkpoint.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
-                                        <td>
-                                            <a href="{{ url_for('client_portal.edit_checkpoint', id=checkpoint.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p class="text-center">No checkpoints found.</p>
-                    {% endif %}
-                </div>
-            </div>
+    {% if checkpoints %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Latitude</th>
+                        <th>Longitude</th>
+                        <th>Radius (m)</th>
+                        <th>Description</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for checkpoint in checkpoints %}
+                    <tr>
+                        <td>{{ checkpoint.name }}</td>
+                        <td>{{ "%.6f"|format(checkpoint.latitude|float) }}</td>
+                        <td>{{ "%.6f"|format(checkpoint.longitude|float) }}</td>
+                        <td>{{ checkpoint.radius }}</td>
+                        <td>{{ checkpoint.description | truncate(100, True) if checkpoint.description else 'N/A' }}</td>
+                        <td>{{ checkpoint.created_at.strftime('%Y-%m-%d %H:%M') if checkpoint.created_at else 'N/A' }}</td>
+                        <td>
+                            <a href="{{ url_for('client_portal.edit_checkpoint', checkpoint_id=checkpoint.id) }}" class="btn btn-sm btn-outline-primary me-1" title="Edit Checkpoint"><i class="bi bi-pencil-fill"></i></a>
+                            <form method="POST" action="{{ url_for('client_portal.delete_checkpoint', checkpoint_id=checkpoint.id) }}" style="display:inline;"
+                                  onsubmit="return confirm('Are you sure you want to delete the checkpoint \'{{ checkpoint.name|e }}\'? This action cannot be undone.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Checkpoint"><i class="bi bi-trash-fill"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-    </div>
-</div>
+    {% else %}
+        <div class="alert alert-info">You haven't added any checkpoints yet. <a href="{{ url_for('client_portal.add_checkpoint') }}">Add your first checkpoint now!</a></div>
+    {% endif %}
 {% endblock %} 

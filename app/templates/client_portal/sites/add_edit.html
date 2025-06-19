@@ -1,40 +1,29 @@
 {% extends "client_portal_base.html" %}
-{% from "_form_helpers.html" import render_field %}
+{% from "_form_helpers.html" import render_field, render_textarea_field %}
 
-{% block title %}{{ action }} Site - {{ current_user.client.name }}{% endblock %}
+{% block title %}{{ title }} - Ultraguard{% endblock %}
 
-{% block page_header %}{{ action }} Site{% endblock %}
+{% block page_header %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
         <div class="card shadow-sm">
             <div class="card-body">
-                <form method="POST" action="" novalidate>
+                <form method="POST" novalidate>
                     {{ form.hidden_tag() }}
-                    {{ render_field(form.name, class="form-control") }}
-                    {{ render_field(form.address, class="form-control", rows=3) }}
-                    {{ render_field(form.description, class="form-control", rows=4) }}
+
+                    {{ render_field(form.name, class="form-control", placeholder="e.g., Main Office, Warehouse Alpha") }}
+                    
+                    {{ render_textarea_field(form.address, class="form-control", rows="3", placeholder="Enter full site address") }}
+
+                    {{ render_textarea_field(form.description, class="form-control", rows="4", placeholder="Optional: Brief description or notes about the site") }}
+
                     <div class="mt-4">
                         {{ form.submit(class="btn btn-primary") }}
-                        <a href="{{ url_for('client_portal.list_sites') }}" class="btn btn-outline-secondary">Cancel</a>
+                        <a href="{{ url_for('client_portal.list_sites') }}" class="btn btn-secondary">Cancel</a>
                     </div>
                 </form>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-4">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <h5 class="card-title">Instructions</h5>
-                <p class="card-text">
-                    <ul class="mb-0">
-                        <li>Site name should be unique within your organization</li>
-                        <li>Provide a complete address for accurate location tracking</li>
-                        <li>Add any relevant details in the description field</li>
-                    </ul>
-                </p>
             </div>
         </div>
     </div>

@@ -1,0 +1,55 @@
+{% extends "client_portal_base.html" %}
+{% from "_form_helpers.html" import render_field, render_select_field %}
+
+{% block title %}{{ title }} - Ultraguard{% endblock %}
+
+{% block page_header %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="POST" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ render_select_field(form.device_id, class="form-select", placeholder="Select Device") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ render_select_field(form.shift_type, class="form-select") }}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ render_select_field(form.route_id, class="form-select", placeholder="Select Route") }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ render_select_field(form.site_id, class="form-select", placeholder="Select Site") }}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            {{ render_field(form.scheduled_date, class="form-control", type="date") }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ render_field(form.scheduled_start_time, class="form-control", type="time") }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ render_field(form.scheduled_end_time, class="form-control", type="time") }}
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        {{ form.submit(class="btn btn-primary", value=form_action_label) }}
+                        <a href="{{ url_for('client_portal.list_shifts') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

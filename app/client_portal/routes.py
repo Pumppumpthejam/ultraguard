@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app, abort
 from flask_login import login_user, logout_user, login_required, current_user
 from urllib.parse import urlparse
 from datetime import datetime, timezone
@@ -15,6 +15,21 @@ from app.exceptions import (
 from app.utils.file_handlers import save_uploaded_file, validate_csv_structure, read_csv_data
 from app.utils.verification import verify_patrol_report
 from app.utils.report_processing import handle_report_submission_and_processing
+from functools import wraps
+
+# Helper decorator for client portal access
+def client_portal_access_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_client_user_type():
+            flash('Please log in to access this page.', 'warning')
+            return redirect(url_for('client_portal.login'))
+        if not current_user.client_id: # Ensure client user is associated with a client
+            flash('Your account is not properly configured. Please contact support.', 'danger')
+            logout_user() # Or handle differently
+            return redirect(url_for('client_portal.login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -186,424 +201,293 @@ def dashboard():
 
 @bp.route('/sites')
 @login_required
+@client_portal_access_required
 def list_sites():
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    
-    client = current_user.client
-    sites = Site.query.filter_by(client_id=client.id).order_by(Site.name).all()
+    # client_id is confirmed by client_portal_access_required
+    sites = Site.query.filter_by(client_id=current_user.client_id).order_by(Site.name).all()
+    # For pagination (optional, can be implemented later):
+    # page = request.args.get('page', 1, type=int)
+    # sites_pagination = Site.query.filter_by(client_id=current_user.client_id).order_by(Site.name).paginate(
+    #     page=page, per_page=current_app.config.get('ITEMS_PER_PAGE', 10), error_out=False
+    # )
+    # sites = sites_pagination.items
+    # return render_template('client_portal/sites/list.html', title='My Sites', sites=sites, pagination=sites_pagination)
     return render_template('client_portal/sites/list.html', title='My Sites', sites=sites)
 
 @bp.route('/sites/add', methods=['GET', 'POST'])
 @login_required
+@client_portal_access_required
 def add_site():
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    
-    form = SiteForm()
+    form = SiteForm(client_id=current_user.client_id) # Pass client_id for validation context
     if form.validate_on_submit():
         try:
-            # Check for duplicate site name within the same client
-            existing_site = Site.query.filter_by(
+            new_site = Site(
                 client_id=current_user.client_id,
-                name=form.name.data
-            ).first()
-            
-            if existing_site:
-                flash('A site with this name already exists for your client.', 'danger')
-                current_app.logger.warning(f"Client {current_user.client_id} attempted to create duplicate site name: {form.name.data}")
-                return render_template('client_portal/sites/add_edit.html', 
-                                    title='Add New Site',
-                                    form=form,
-                                    action='Add')
-            
-            site = Site(
-                client_id=current_user.client_id,
-                name=form.name.data,
-                address=form.address.data,
-                description=form.description.data
+                name=form.name.data.strip(),
+                address=form.address.data.strip() if form.address.data else None,
+                description=form.description.data.strip() if form.description.data else None
             )
-            db.session.add(site)
+            db.session.add(new_site)
             db.session.commit()
-            
-            flash('Site added successfully!', 'success')
-            current_app.logger.info(f"Client {current_user.client_id} added new site: {site.name} (ID: {site.id})")
+            flash(f"Site '{new_site.name}' created successfully!", 'success')
+            current_app.logger.info(f"ClientUser {current_user.id} (Client {current_user.client_id}) created site {new_site.id} ('{new_site.name}').")
             return redirect(url_for('client_portal.list_sites'))
-            
-        except IntegrityError as e:
+        except IntegrityError as e: # Should be caught by form validator, but good DB fallback
             db.session.rollback()
-            current_app.logger.error(f"IntegrityError adding site for client {current_user.client_id}: {e}", exc_info=True)
-            flash('Error: A site with this name may already exist.', 'danger')
-            
+            current_app.logger.warning(f"IntegrityError for Client {current_user.client_id} adding site '{form.name.data}': {e}")
+            flash('Error: A site with this name already exists for your client.', 'danger')
         except SQLAlchemyError as e:
             db.session.rollback()
-            current_app.logger.error(f"Database error adding site for client {current_user.client_id}: {e}", exc_info=True)
-            flash('A database error occurred. Please try again.', 'danger')
-            
+            current_app.logger.error(f"SQLAlchemyError for Client {current_user.client_id} adding site '{form.name.data}': {e}", exc_info=True)
+            flash('A database error occurred while creating the site. Please try again.', 'danger')
         except Exception as e:
             db.session.rollback()
-            current_app.logger.critical(f"Unexpected error adding site for client {current_user.client_id}: {e}", exc_info=True)
+            current_app.logger.critical(f"Unexpected error for Client {current_user.client_id} adding site '{form.name.data}': {e}", exc_info=True)
             flash('An unexpected error occurred. Please try again or contact support.', 'danger')
     
-    return render_template('client_portal/sites/add_edit.html', 
-                         title='Add New Site',
-                         form=form,
-                         action='Add')
+    return render_template('client_portal/sites/add_edit.html', title='Add New Site', form=form, form_action_label='Create Site')
 
-@bp.route('/sites/<int:id>/edit', methods=['GET', 'POST'])
+@bp.route('/sites/edit/<int:site_id>', methods=['GET', 'POST'])
 @login_required
-def edit_site(id):
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    
-    site = Site.query.filter_by(id=id, client_id=current_user.client_id).first_or_404()
-    form = SiteForm(obj=site)
-    
+@client_portal_access_required
+def edit_site(site_id):
+    site = db.session.get(Site, site_id)
+    if not site or site.client_id != current_user.client_id:
+        current_app.logger.warning(f"ClientUser {current_user.id} (Client {current_user.client_id}) attempt to edit unauthorized/non-existent site {site_id}.")
+        abort(404, description="Site not found or not authorized.")
+
+    form = SiteForm(obj=site, original_name=site.name, client_id=current_user.client_id)
     if form.validate_on_submit():
         try:
-            # Check for duplicate site name within the same client (excluding current site)
-            existing_site = Site.query.filter(
-                Site.client_id == current_user.client_id,
-                Site.name == form.name.data,
-                Site.id != id
-            ).first()
-            
-            if existing_site:
-                flash('A site with this name already exists for your client.', 'danger')
-                current_app.logger.warning(f"Client {current_user.client_id} attempted to rename site {id} to duplicate name: {form.name.data}")
-                return render_template('client_portal/sites/add_edit.html',
-                                    title='Edit Site',
-                                    form=form,
-                                    site=site,
-                                    action='Edit')
-            
-            site.name = form.name.data
-            site.address = form.address.data
-            site.description = form.description.data
+            site.name = form.name.data.strip()
+            site.address = form.address.data.strip() if form.address.data else None
+            site.description = form.description.data.strip() if form.description.data else None
             db.session.commit()
-            
-            flash('Site updated successfully!', 'success')
-            current_app.logger.info(f"Client {current_user.client_id} updated site: {site.name} (ID: {site.id})")
+            flash(f"Site '{site.name}' updated successfully!", 'success')
+            current_app.logger.info(f"ClientUser {current_user.id} (Client {current_user.client_id}) updated site {site.id} ('{site.name}').")
             return redirect(url_for('client_portal.list_sites'))
-            
         except IntegrityError as e:
             db.session.rollback()
-            current_app.logger.error(f"IntegrityError updating site {id} for client {current_user.client_id}: {e}", exc_info=True)
-            flash('Error: A site with this name may already exist.', 'danger')
-            
+            current_app.logger.warning(f"IntegrityError for Client {current_user.client_id} editing site {site.id} to name '{form.name.data}': {e}")
+            flash('Error: A site with this name already exists for your client.', 'danger')
         except SQLAlchemyError as e:
             db.session.rollback()
-            current_app.logger.error(f"Database error updating site {id} for client {current_user.client_id}: {e}", exc_info=True)
-            flash('A database error occurred. Please try again.', 'danger')
-            
+            current_app.logger.error(f"SQLAlchemyError for Client {current_user.client_id} editing site {site.id}: {e}", exc_info=True)
+            flash('A database error occurred while updating the site. Please try again.', 'danger')
         except Exception as e:
             db.session.rollback()
-            current_app.logger.critical(f"Unexpected error updating site {id} for client {current_user.client_id}: {e}", exc_info=True)
+            current_app.logger.critical(f"Unexpected error for Client {current_user.client_id} editing site {site.id}: {e}", exc_info=True)
             flash('An unexpected error occurred. Please try again or contact support.', 'danger')
-    
-    return render_template('client_portal/sites/add_edit.html',
-                         title='Edit Site',
-                         form=form,
-                         site=site,
-                         action='Edit')
 
-@bp.route('/sites/<int:id>/delete', methods=['POST'])
+    return render_template('client_portal/sites/add_edit.html', title=f"Edit Site: {site.name}", form=form, site=site, form_action_label='Update Site')
+
+@bp.route('/sites/delete/<int:site_id>', methods=['POST'])
 @login_required
-def delete_site(id):
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    
-    site = Site.query.filter_by(id=id, client_id=current_user.client_id).first_or_404()
-    
+@client_portal_access_required
+def delete_site(site_id):
+    site = db.session.get(Site, site_id)
+    if not site or site.client_id != current_user.client_id:
+        current_app.logger.warning(f"ClientUser {current_user.id} (Client {current_user.client_id}) attempt to delete unauthorized/non-existent site {site_id}.")
+        flash("Site not found or you do not have permission to delete it.", 'danger')
+        return redirect(url_for('client_portal.list_sites'))
+
+    # Dependency Check (Example: Shifts linked to this site)
+    if site.shifts: # .shifts is the backref from Shift model
+        flash(f"Error: Site '{site.name}' cannot be deleted because it has shifts associated with it. Please reassign or delete those shifts first.", 'danger')
+        current_app.logger.warning(f"ClientUser {current_user.id} (Client {current_user.client_id}) attempt to delete site {site.id} with dependent shifts.")
+        return redirect(url_for('client_portal.list_sites'))
+
     try:
-        # Check for dependent shifts
-        dependent_shifts = Shift.query.filter_by(site_id=id).first()
-        if dependent_shifts:
-            flash('Cannot delete site: It has associated shifts. Please delete or reassign the shifts first.', 'danger')
-            current_app.logger.warning(f"Client {current_user.client_id} attempted to delete site {id} with dependent shifts")
-            return redirect(url_for('client_portal.list_sites'))
-        
-        # Log the deletion attempt
-        current_app.logger.info(f"Client {current_user.client_id} attempting to delete site: {site.name} (ID: {site.id})")
-        
-        # Delete the site
+        site_name_for_log = site.name
         db.session.delete(site)
         db.session.commit()
-        
-        flash('Site deleted successfully!', 'success')
-        current_app.logger.info(f"Client {current_user.client_id} successfully deleted site: {site.name} (ID: {site.id})")
-        return redirect(url_for('client_portal.list_sites'))
-        
-    except IntegrityError as e:
+        flash(f"Site '{site_name_for_log}' deleted successfully.", 'success')
+        current_app.logger.info(f"ClientUser {current_user.id} (Client {current_user.client_id}) deleted site {site_id} ('{site_name_for_log}').")
+    except SQLAlchemyError as e: # Catch potential errors if cascade delete fails, etc.
         db.session.rollback()
-        current_app.logger.error(f"IntegrityError deleting site {id} for client {current_user.client_id}: {e}", exc_info=True)
-        flash('Error: Cannot delete site because it has associated records in the system.', 'danger')
-        
-    except SQLAlchemyError as e:
-        db.session.rollback()
-        current_app.logger.error(f"Database error deleting site {id} for client {current_user.client_id}: {e}", exc_info=True)
-        flash('A database error occurred. Please try again.', 'danger')
-        
+        current_app.logger.error(f"SQLAlchemyError for Client {current_user.client_id} deleting site {site.id}: {e}", exc_info=True)
+        flash('A database error occurred while deleting the site.', 'danger')
     except Exception as e:
         db.session.rollback()
-        current_app.logger.critical(f"Unexpected error deleting site {id} for client {current_user.client_id}: {e}", exc_info=True)
+        current_app.logger.critical(f"Unexpected error for Client {current_user.client_id} deleting site {site.id}: {e}", exc_info=True)
         flash('An unexpected error occurred. Please try again or contact support.', 'danger')
-    
+        
     return redirect(url_for('client_portal.list_sites'))
 
 @bp.route('/checkpoints')
 @login_required
+@client_portal_access_required
 def list_checkpoints():
-    if not (hasattr(current_user, 'is_client_user_type') and current_user.is_client_user_type()):
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    checkpoints = Checkpoint.query\
-        .join(RouteCheckpoint, Checkpoint.id == RouteCheckpoint.checkpoint_id)\
-        .join(Route, RouteCheckpoint.route_id == Route.id)\
-        .filter(Route.client_id == current_user.client.id)\
-        .distinct()\
-        .all()
+    checkpoints = Checkpoint.query.filter_by(client_id=current_user.client_id).order_by(Checkpoint.name).all()
     return render_template('client_portal/checkpoints/list.html', title='My Checkpoints', checkpoints=checkpoints)
 
 @bp.route('/routes')
 @login_required
+@client_portal_access_required
 def list_routes():
-    if not (hasattr(current_user, 'is_client_user_type') and current_user.is_client_user_type()):
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    routes = Route.query.filter_by(client_id=current_user.client.id).all()
+    routes = Route.query.filter_by(client_id=current_user.client_id).order_by(Route.name).all()
     return render_template('client_portal/routes/list.html', title='My Routes', routes=routes)
 
 @bp.route('/routes/add', methods=['GET', 'POST'])
 @login_required
+@client_portal_access_required
 def add_route():
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    
-    form = RouteForm()
-    # Populate checkpoint choices with only checkpoints belonging to the current client
-    form.checkpoints.choices = [(c.id, c.name) for c in Checkpoint.query.filter_by(client_id=current_user.client_id).order_by(Checkpoint.name).all()]
-    
+    form = RouteForm(client_id=current_user.client_id)
+    # Populate checkpoints select field with this client's checkpoints
+    form.checkpoints.choices = [
+        (c.id, c.name) for c in Checkpoint.query.filter_by(
+            client_id=current_user.client_id
+        ).order_by('name').all()
+    ]
+
     if form.validate_on_submit():
         try:
-            # Check for duplicate route name within the same client
-            existing_route = Route.query.filter_by(
+            new_route = Route(
                 client_id=current_user.client_id,
-                name=form.name.data
-            ).first()
-            
-            if existing_route:
-                flash('A route with this name already exists for your client.', 'danger')
-                current_app.logger.warning(f"Client {current_user.client_id} attempted to create duplicate route name: {form.name.data}")
-                return render_template('client_portal/routes/add_edit.html', 
-                                    title='Add New Route',
-                                    form=form,
-                                    action='Add')
-            
-            # Create the route
-            route = Route(
-                client_id=current_user.client_id,
-                name=form.name.data,
-                description=form.description.data
+                name=form.name.data.strip(),
+                description=form.description.data.strip() if form.description.data else None
             )
-            db.session.add(route)
-            db.session.flush()  # Get the route ID without committing
             
-            # Add checkpoints in the specified order
-            for sequence, checkpoint_id in enumerate(form.checkpoints.data, start=1):
-                route_checkpoint = RouteCheckpoint(
-                    route_id=route.id,
-                    checkpoint_id=checkpoint_id,
-                    sequence_order=sequence
-                )
-                db.session.add(route_checkpoint)
+            # Find selected checkpoints and add them to the route
+            selected_checkpoints = db.session.query(Checkpoint).filter(Checkpoint.id.in_(form.checkpoints.data)).all()
             
+            order = 1
+            for checkpoint in selected_checkpoints:
+                 # Ensure the order of checkpoints is preserved as submitted
+                if checkpoint in selected_checkpoints:
+                    route_checkpoint = RouteCheckpoint(checkpoint=checkpoint, order=order)
+                    new_route.checkpoints.append(route_checkpoint)
+                    order += 1
+
+            db.session.add(new_route)
             db.session.commit()
             
-            flash('Route added successfully!', 'success')
-            current_app.logger.info(f"Client {current_user.client_id} added new route: {route.name} (ID: {route.id}) with {len(form.checkpoints.data)} checkpoints")
+            flash(f"Route '{new_route.name}' created successfully!", 'success')
+            current_app.logger.info(f"ClientUser {current_user.id} created route {new_route.id} with {len(selected_checkpoints)} checkpoints.")
             return redirect(url_for('client_portal.list_routes'))
-            
         except IntegrityError as e:
             db.session.rollback()
-            error_msg = str(e)
-            if "UNIQUE constraint failed" in error_msg and "routes.name" in error_msg:
-                flash('Error: A route with this name already exists for your client.', 'danger')
-            elif "UNIQUE constraint failed" in error_msg and "route_checkpoints" in error_msg:
-                flash('Error: Invalid checkpoint selection. Please ensure all checkpoints are valid and unique.', 'danger')
-            else:
-                flash('Error: A data conflict occurred. Please check your input and try again.', 'danger')
-            current_app.logger.error(f"IntegrityError adding route for client {current_user.client_id}: {error_msg}", exc_info=True)
-            
+            current_app.logger.warning(f"IntegrityError for Client {current_user.client_id} adding route '{form.name.data}': {e}")
+            flash('Error: A route with this name already exists.', 'danger')
         except SQLAlchemyError as e:
             db.session.rollback()
-            current_app.logger.error(f"Database error adding route for client {current_user.client_id}: {str(e)}", exc_info=True)
+            current_app.logger.error(f"SQLAlchemyError adding route for client {current_user.client_id}: {e}", exc_info=True)
             flash('A database error occurred. Please try again.', 'danger')
-            
         except Exception as e:
             db.session.rollback()
-            current_app.logger.critical(f"Unexpected error adding route for client {current_user.client_id}: {str(e)}", exc_info=True)
-            flash('An unexpected error occurred. Please try again or contact support.', 'danger')
-    
-    return render_template('client_portal/routes/add_edit.html', 
-                         title='Add New Route',
-                         form=form,
-                         action='Add')
+            current_app.logger.critical(f"Unexpected error for Client {current_user.client_id} adding route: {e}", exc_info=True)
+            flash('An unexpected error occurred. Please contact support.', 'danger')
 
-@bp.route('/routes/<int:id>/edit', methods=['GET', 'POST'])
+    return render_template('client_portal/routes/add_edit.html', title='Add New Route', form=form, form_action_label='Create Route')
+
+@bp.route('/routes/edit/<int:route_id>', methods=['GET', 'POST'])
 @login_required
-def edit_route(id):
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    
-    route = Route.query.filter_by(id=id, client_id=current_user.client_id).first_or_404()
-    form = RouteForm(obj=route)
-    
-    # Populate checkpoint choices with only checkpoints belonging to the current client
-    form.checkpoints.choices = [(c.id, c.name) for c in Checkpoint.query.filter_by(client_id=current_user.client_id).order_by(Checkpoint.name).all()]
-    
-    # Pre-select current checkpoints in the correct order
-    if request.method == 'GET':
-        form.checkpoints.data = [rc.checkpoint_id for rc in route.route_checkpoints.order_by(RouteCheckpoint.sequence_order)]
-    
+@client_portal_access_required
+def edit_route(route_id):
+    route = db.session.get(Route, route_id)
+    if not route or route.client_id != current_user.client_id:
+        abort(404)
+
+    form = RouteForm(obj=route, original_name=route.name, client_id=current_user.client_id)
+    form.checkpoints.choices = [
+        (c.id, c.name) for c in Checkpoint.query.filter_by(
+            client_id=current_user.client_id
+        ).order_by('name').all()
+    ]
+
     if form.validate_on_submit():
         try:
-            # Check for duplicate route name within the same client (excluding current route)
-            existing_route = Route.query.filter(
-                Route.client_id == current_user.client_id,
-                Route.name == form.name.data,
-                Route.id != id
-            ).first()
+            route.name = form.name.data.strip()
+            route.description = form.description.data.strip() if form.description.data else None
             
-            if existing_route:
-                flash('A route with this name already exists for your client.', 'danger')
-                current_app.logger.warning(f"Client {current_user.client_id} attempted to rename route {id} to duplicate name: {form.name.data}")
-                return render_template('client_portal/routes/add_edit.html',
-                                    title='Edit Route',
-                                    form=form,
-                                    route=route,
-                                    action='Edit')
-            
-            # Update route details
-            route.name = form.name.data
-            route.description = form.description.data
-            
-            # Update checkpoints
-            # First, remove all existing route checkpoints
-            RouteCheckpoint.query.filter_by(route_id=route.id).delete()
-            
-            # Then add the new ones in the specified order
-            for sequence, checkpoint_id in enumerate(form.checkpoints.data, start=1):
-                route_checkpoint = RouteCheckpoint(
-                    route_id=route.id,
-                    checkpoint_id=checkpoint_id,
-                    sequence_order=sequence
-                )
-                db.session.add(route_checkpoint)
+            # Efficiently update checkpoints
+            # Get the set of currently associated checkpoint IDs
+            current_checkpoint_ids = {rc.checkpoint_id for rc in route.checkpoints}
+            # Get the set of submitted checkpoint IDs
+            submitted_checkpoint_ids = set(form.checkpoints.data)
+
+            # Find which checkpoints to add and which to remove
+            ids_to_add = submitted_checkpoint_ids - current_checkpoint_ids
+            ids_to_remove = current_checkpoint_ids - submitted_checkpoint_ids
+
+            # Remove the old ones
+            if ids_to_remove:
+                RouteCheckpoint.query.filter(
+                    RouteCheckpoint.route_id == route.id,
+                    RouteCheckpoint.checkpoint_id.in_(ids_to_remove)
+                ).delete(synchronize_session=False)
+
+            # Add the new ones
+            if ids_to_add:
+                order = len(current_checkpoint_ids) - len(ids_to_remove) + 1
+                for checkpoint_id in ids_to_add:
+                    # Verify checkpoint ownership again for security
+                    chk = db.session.get(Checkpoint, checkpoint_id)
+                    if chk and chk.client_id == current_user.client_id:
+                        db.session.add(RouteCheckpoint(route_id=route.id, checkpoint_id=checkpoint_id, order=order))
+                        order += 1
             
             db.session.commit()
-            
-            flash('Route updated successfully!', 'success')
-            current_app.logger.info(f"Client {current_user.client_id} updated route: {route.name} (ID: {route.id}) with {len(form.checkpoints.data)} checkpoints")
+            flash(f"Route '{route.name}' updated successfully!", 'success')
+            current_app.logger.info(f"ClientUser {current_user.id} updated route {route.id}.")
             return redirect(url_for('client_portal.list_routes'))
-            
-        except IntegrityError as e:
-            db.session.rollback()
-            error_msg = str(e)
-            if "UNIQUE constraint failed" in error_msg and "routes.name" in error_msg:
-                flash('Error: A route with this name already exists for your client.', 'danger')
-            elif "UNIQUE constraint failed" in error_msg and "route_checkpoints" in error_msg:
-                flash('Error: Invalid checkpoint selection. Please ensure all checkpoints are valid and unique.', 'danger')
-            else:
-                flash('Error: A data conflict occurred. Please check your input and try again.', 'danger')
-            current_app.logger.error(f"IntegrityError updating route {id} for client {current_user.client_id}: {error_msg}", exc_info=True)
-            
         except SQLAlchemyError as e:
             db.session.rollback()
-            current_app.logger.error(f"Database error updating route {id} for client {current_user.client_id}: {str(e)}", exc_info=True)
+            current_app.logger.error(f"SQLAlchemyError editing route {route_id}: {e}", exc_info=True)
             flash('A database error occurred. Please try again.', 'danger')
-            
         except Exception as e:
             db.session.rollback()
-            current_app.logger.critical(f"Unexpected error updating route {id} for client {current_user.client_id}: {str(e)}", exc_info=True)
-            flash('An unexpected error occurred. Please try again or contact support.', 'danger')
-    
-    return render_template('client_portal/routes/add_edit.html',
-                         title='Edit Route',
-                         form=form,
-                         route=route,
-                         action='Edit')
+            current_app.logger.critical(f"Unexpected error editing route {route_id}: {e}", exc_info=True)
+            flash('An unexpected error occurred. Please contact support.', 'danger')
 
-@bp.route('/routes/<int:id>/delete', methods=['POST'])
+    # Pre-populate the form with the route's current checkpoints for the GET request
+    if request.method == 'GET':
+        form.checkpoints.data = [rc.checkpoint_id for rc in route.checkpoints]
+
+    return render_template('client_portal/routes/add_edit.html', title=f"Edit Route: {route.name}", form=form, route=route, form_action_label='Update Route')
+
+@bp.route('/routes/delete/<int:route_id>', methods=['POST'])
 @login_required
-def delete_route(id):
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    
-    route = Route.query.filter_by(id=id, client_id=current_user.client_id).first_or_404()
-    
+@client_portal_access_required
+def delete_route(route_id):
+    route = db.session.get(Route, route_id)
+    if not route or route.client_id != current_user.client_id:
+        flash("Route not found or you do not have permission to delete it.", 'danger')
+        return redirect(url_for('client_portal.list_routes'))
+
+    # Dependency Check: Check if route is used in any Shifts
+    if route.shifts:
+        flash(f"Error: Route '{route.name}' cannot be deleted as it is assigned to one or more shifts.", 'danger')
+        current_app.logger.warning(f"ClientUser {current_user.id} attempt to delete route {route_id} with dependent shifts.")
+        return redirect(url_for('client_portal.list_routes'))
+
     try:
-        # Check for dependent shifts
-        if route.shifts.first():
-            flash(f"Error: Route '{route.name}' cannot be deleted because it is currently used in one or more scheduled shifts. Please unassign it from all shifts first.", 'danger')
-            current_app.logger.warning(f"Client {current_user.client_id} attempted to delete route {id} used in shifts")
-            return redirect(url_for('client_portal.list_routes'))
-        
-        # Log the deletion attempt
-        current_app.logger.info(f"Client {current_user.client_id} attempting to delete route: {route.name} (ID: {route.id})")
-        
-        # Delete the route (RouteCheckpoint records will be deleted automatically due to cascade)
+        route_name_for_log = route.name
+        # The cascade delete on the Route model should handle deleting RouteCheckpoint entries
         db.session.delete(route)
         db.session.commit()
-        
-        flash('Route deleted successfully!', 'success')
-        current_app.logger.info(f"Client {current_user.client_id} successfully deleted route: {route.name} (ID: {route.id})")
-        return redirect(url_for('client_portal.list_routes'))
-        
-    except IntegrityError as e:
-        db.session.rollback()
-        current_app.logger.error(f"IntegrityError deleting route {id} for client {current_user.client_id}: {e}", exc_info=True)
-        flash('Error: Cannot delete route because it has associated records in the system.', 'danger')
-        
+        flash(f"Route '{route_name_for_log}' deleted successfully.", 'success')
+        current_app.logger.info(f"ClientUser {current_user.id} deleted route {route_id} ('{route_name_for_log}').")
     except SQLAlchemyError as e:
         db.session.rollback()
-        current_app.logger.error(f"Database error deleting route {id} for client {current_user.client_id}: {e}", exc_info=True)
-        flash('A database error occurred. Please try again.', 'danger')
-        
+        current_app.logger.error(f"SQLAlchemyError deleting route {route_id}: {e}", exc_info=True)
+        flash('A database error occurred while deleting the route.', 'danger')
     except Exception as e:
         db.session.rollback()
-        current_app.logger.critical(f"Unexpected error deleting route {id} for client {current_user.client_id}: {e}", exc_info=True)
-        flash('An unexpected error occurred. Please try again or contact support.', 'danger')
-    
+        current_app.logger.critical(f"Unexpected error deleting route {route_id}: {e}", exc_info=True)
+        flash('An unexpected error occurred. Please contact support.', 'danger')
+
     return redirect(url_for('client_portal.list_routes'))
 
 @bp.route('/shifts')
 @login_required
+@client_portal_access_required
 def list_shifts():
-    if not (hasattr(current_user, 'is_client_user_type') and current_user.is_client_user_type()):
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-
-    client = current_user.client
-    if not client:
-        flash('Your user account is not associated with a client company. Please contact support.', 'danger')
-        logout_user()
-        return redirect(url_for('client_portal.login'))
-
-    # Get shifts through device relationship
     shifts = Shift.query\
         .join(Device, Shift.device_id == Device.id)\
-        .filter(Device.client_id == client.id)\
-        .order_by(Shift.start_time.desc())\
+        .filter(Device.client_id == current_user.client_id)\
+        .order_by(Shift.scheduled_date.desc(), Shift.scheduled_start_time)\
         .all()
-
     return render_template('client_portal/shifts/list.html', title='My Shifts', shifts=shifts)
 
 @bp.route('/devices')
@@ -704,285 +588,121 @@ def list_uploaded_reports():
 
 @bp.route('/checkpoints/add', methods=['GET', 'POST'])
 @login_required
+@client_portal_access_required
 def add_checkpoint():
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    
-    form = CheckpointForm()
+    form = CheckpointForm(client_id=current_user.client_id)
     if form.validate_on_submit():
         try:
-            # Check for duplicate checkpoint name within the same client
-            existing_checkpoint = Checkpoint.query.filter_by(
+            new_checkpoint = Checkpoint(
                 client_id=current_user.client_id,
-                name=form.name.data
-            ).first()
-            
-            if existing_checkpoint:
-                flash('A checkpoint with this name already exists for your client.', 'danger')
-                current_app.logger.warning(f"Client {current_user.client_id} attempted to create duplicate checkpoint name: {form.name.data}")
-                return render_template('client_portal/checkpoints/add_edit.html', 
-                                    title='Add New Checkpoint',
-                                    form=form,
-                                    action='Add')
-            
-            # Validate coordinates
-            if not (-90 <= form.latitude.data <= 90):
-                flash('Latitude must be between -90 and 90 degrees.', 'danger')
-                return render_template('client_portal/checkpoints/add_edit.html',
-                                    title='Add New Checkpoint',
-                                    form=form,
-                                    action='Add')
-            
-            if not (-180 <= form.longitude.data <= 180):
-                flash('Longitude must be between -180 and 180 degrees.', 'danger')
-                return render_template('client_portal/checkpoints/add_edit.html',
-                                    title='Add New Checkpoint',
-                                    form=form,
-                                    action='Add')
-            
-            if form.radius.data <= 0:
-                flash('Radius must be a positive number.', 'danger')
-                return render_template('client_portal/checkpoints/add_edit.html',
-                                    title='Add New Checkpoint',
-                                    form=form,
-                                    action='Add')
-            
-            checkpoint = Checkpoint(
-                client_id=current_user.client_id,
-                name=form.name.data,
+                name=form.name.data.strip(),
+                description=form.description.data.strip() if form.description.data else None,
                 latitude=form.latitude.data,
                 longitude=form.longitude.data,
-                radius=form.radius.data,
-                description=form.description.data
+                radius=form.radius.data
             )
-            db.session.add(checkpoint)
+            db.session.add(new_checkpoint)
             db.session.commit()
-            
-            flash('Checkpoint added successfully!', 'success')
-            current_app.logger.info(f"Client {current_user.client_id} added new checkpoint: {checkpoint.name} (ID: {checkpoint.id})")
+            flash(f"Checkpoint '{new_checkpoint.name}' created successfully!", 'success')
+            current_app.logger.info(f"ClientUser {current_user.id} (Client {current_user.client_id}) created checkpoint {new_checkpoint.id} ('{new_checkpoint.name}').")
             return redirect(url_for('client_portal.list_checkpoints'))
-            
         except IntegrityError as e:
             db.session.rollback()
-            current_app.logger.error(f"IntegrityError adding checkpoint for client {current_user.client_id}: {e}", exc_info=True)
-            flash('Error: A checkpoint with this name may already exist.', 'danger')
-            
+            current_app.logger.warning(f"IntegrityError for Client {current_user.client_id} adding checkpoint '{form.name.data}': {e}")
+            flash('Error: A checkpoint with this name already exists.', 'danger')
         except SQLAlchemyError as e:
             db.session.rollback()
-            current_app.logger.error(f"Database error adding checkpoint for client {current_user.client_id}: {e}", exc_info=True)
+            current_app.logger.error(f"SQLAlchemyError for Client {current_user.client_id} adding checkpoint: {e}", exc_info=True)
             flash('A database error occurred. Please try again.', 'danger')
-            
         except Exception as e:
             db.session.rollback()
-            current_app.logger.critical(f"Unexpected error adding checkpoint for client {current_user.client_id}: {e}", exc_info=True)
-            flash('An unexpected error occurred. Please try again or contact support.', 'danger')
+            current_app.logger.critical(f"Unexpected error for Client {current_user.client_id} adding checkpoint: {e}", exc_info=True)
+            flash('An unexpected error occurred. Please contact support.', 'danger')
     
-    return render_template('client_portal/checkpoints/add_edit.html', 
-                         title='Add New Checkpoint',
-                         form=form,
-                         action='Add')
+    return render_template('client_portal/checkpoints/add_edit.html', title='Add New Checkpoint', form=form, form_action_label='Create Checkpoint')
 
-@bp.route('/checkpoints/<int:id>/edit', methods=['GET', 'POST'])
+@bp.route('/checkpoints/edit/<int:checkpoint_id>', methods=['GET', 'POST'])
 @login_required
-def edit_checkpoint(id):
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    
-    checkpoint = Checkpoint.query.filter_by(id=id, client_id=current_user.client_id).first_or_404()
-    form = CheckpointForm(obj=checkpoint)
-    
+@client_portal_access_required
+def edit_checkpoint(checkpoint_id):
+    checkpoint = db.session.get(Checkpoint, checkpoint_id)
+    if not checkpoint or checkpoint.client_id != current_user.client_id:
+        current_app.logger.warning(f"ClientUser {current_user.id} unauthorized edit attempt on checkpoint {checkpoint_id}.")
+        abort(404)
+
+    form = CheckpointForm(obj=checkpoint, original_name=checkpoint.name, client_id=current_user.client_id)
     if form.validate_on_submit():
         try:
-            # Check for duplicate checkpoint name within the same client (excluding current checkpoint)
-            existing_checkpoint = Checkpoint.query.filter(
-                Checkpoint.client_id == current_user.client_id,
-                Checkpoint.name == form.name.data,
-                Checkpoint.id != id
-            ).first()
-            
-            if existing_checkpoint:
-                flash('A checkpoint with this name already exists for your client.', 'danger')
-                current_app.logger.warning(f"Client {current_user.client_id} attempted to rename checkpoint {id} to duplicate name: {form.name.data}")
-                return render_template('client_portal/checkpoints/add_edit.html',
-                                    title='Edit Checkpoint',
-                                    form=form,
-                                    checkpoint=checkpoint,
-                                    action='Edit')
-            
-            # Validate coordinates
-            if not (-90 <= form.latitude.data <= 90):
-                flash('Latitude must be between -90 and 90 degrees.', 'danger')
-                return render_template('client_portal/checkpoints/add_edit.html',
-                                    title='Edit Checkpoint',
-                                    form=form,
-                                    checkpoint=checkpoint,
-                                    action='Edit')
-            
-            if not (-180 <= form.longitude.data <= 180):
-                flash('Longitude must be between -180 and 180 degrees.', 'danger')
-                return render_template('client_portal/checkpoints/add_edit.html',
-                                    title='Edit Checkpoint',
-                                    form=form,
-                                    checkpoint=checkpoint,
-                                    action='Edit')
-            
-            if form.radius.data <= 0:
-                flash('Radius must be a positive number.', 'danger')
-                return render_template('client_portal/checkpoints/add_edit.html',
-                                    title='Edit Checkpoint',
-                                    form=form,
-                                    checkpoint=checkpoint,
-                                    action='Edit')
-            
-            checkpoint.name = form.name.data
+            checkpoint.name = form.name.data.strip()
+            checkpoint.description = form.description.data.strip() if form.description.data else None
             checkpoint.latitude = form.latitude.data
             checkpoint.longitude = form.longitude.data
             checkpoint.radius = form.radius.data
-            checkpoint.description = form.description.data
             db.session.commit()
-            
-            flash('Checkpoint updated successfully!', 'success')
-            current_app.logger.info(f"Client {current_user.client_id} updated checkpoint: {checkpoint.name} (ID: {checkpoint.id})")
+            flash(f"Checkpoint '{checkpoint.name}' updated successfully!", 'success')
+            current_app.logger.info(f"ClientUser {current_user.id} updated checkpoint {checkpoint.id}.")
             return redirect(url_for('client_portal.list_checkpoints'))
-            
         except IntegrityError as e:
             db.session.rollback()
-            current_app.logger.error(f"IntegrityError updating checkpoint {id} for client {current_user.client_id}: {e}", exc_info=True)
-            flash('Error: A checkpoint with this name may already exist.', 'danger')
-            
+            current_app.logger.warning(f"IntegrityError for Client {current_user.client_id} editing checkpoint {checkpoint_id}: {e}")
+            flash('Error: A checkpoint with this name already exists.', 'danger')
         except SQLAlchemyError as e:
             db.session.rollback()
-            current_app.logger.error(f"Database error updating checkpoint {id} for client {current_user.client_id}: {e}", exc_info=True)
+            current_app.logger.error(f"SQLAlchemyError editing checkpoint {checkpoint_id}: {e}", exc_info=True)
             flash('A database error occurred. Please try again.', 'danger')
-            
         except Exception as e:
             db.session.rollback()
-            current_app.logger.critical(f"Unexpected error updating checkpoint {id} for client {current_user.client_id}: {e}", exc_info=True)
-            flash('An unexpected error occurred. Please try again or contact support.', 'danger')
-    
-    return render_template('client_portal/checkpoints/add_edit.html',
-                         title='Edit Checkpoint',
-                         form=form,
-                         checkpoint=checkpoint,
-                         action='Edit')
+            current_app.logger.critical(f"Unexpected error editing checkpoint {checkpoint_id}: {e}", exc_info=True)
+            flash('An unexpected error occurred. Please contact support.', 'danger')
 
-@bp.route('/checkpoints/<int:id>/delete', methods=['POST'])
+    return render_template('client_portal/checkpoints/add_edit.html', title=f"Edit Checkpoint: {checkpoint.name}", form=form, checkpoint=checkpoint, form_action_label='Update Checkpoint')
+
+@bp.route('/checkpoints/delete/<int:checkpoint_id>', methods=['POST'])
 @login_required
-def delete_checkpoint(id):
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
-    
-    checkpoint = Checkpoint.query.filter_by(id=id, client_id=current_user.client_id).first_or_404()
-    
+@client_portal_access_required
+def delete_checkpoint(checkpoint_id):
+    checkpoint = db.session.get(Checkpoint, checkpoint_id)
+    if not checkpoint or checkpoint.client_id != current_user.client_id:
+        flash("Checkpoint not found or you do not have permission to delete it.", 'danger')
+        return redirect(url_for('client_portal.list_checkpoints'))
+
+    # Dependency Check: Check if the checkpoint is used in any RouteCheckpoint mapping
+    if db.session.query(RouteCheckpoint).filter_by(checkpoint_id=checkpoint.id).first():
+        flash(f"Error: Checkpoint '{checkpoint.name}' cannot be deleted because it is part of one or more routes.", 'danger')
+        current_app.logger.warning(f"ClientUser {current_user.id} attempt to delete checkpoint {checkpoint_id} with dependent routes.")
+        return redirect(url_for('client_portal.list_checkpoints'))
+
     try:
-        # Check for dependent route associations
-        if checkpoint.route_associations.first():
-            flash(f"Error: Checkpoint '{checkpoint.name}' cannot be deleted because it is currently used in one or more routes. Please remove it from all routes first.", 'danger')
-            current_app.logger.warning(f"Client {current_user.client_id} attempted to delete checkpoint {id} used in routes")
-            return redirect(url_for('client_portal.list_checkpoints'))
-        
-        # Log the deletion attempt
-        current_app.logger.info(f"Client {current_user.client_id} attempting to delete checkpoint: {checkpoint.name} (ID: {checkpoint.id})")
-        
-        # Delete the checkpoint
+        checkpoint_name_for_log = checkpoint.name
         db.session.delete(checkpoint)
         db.session.commit()
-        
-        flash('Checkpoint deleted successfully!', 'success')
-        current_app.logger.info(f"Client {current_user.client_id} successfully deleted checkpoint: {checkpoint.name} (ID: {checkpoint.id})")
-        return redirect(url_for('client_portal.list_checkpoints'))
-        
-    except IntegrityError as e:
-        db.session.rollback()
-        current_app.logger.error(f"IntegrityError deleting checkpoint {id} for client {current_user.client_id}: {e}", exc_info=True)
-        flash('Error: Cannot delete checkpoint because it has associated records in the system.', 'danger')
-        
+        flash(f"Checkpoint '{checkpoint_name_for_log}' deleted successfully.", 'success')
+        current_app.logger.info(f"ClientUser {current_user.id} deleted checkpoint {checkpoint_id} ('{checkpoint_name_for_log}').")
     except SQLAlchemyError as e:
         db.session.rollback()
-        current_app.logger.error(f"Database error deleting checkpoint {id} for client {current_user.client_id}: {e}", exc_info=True)
-        flash('A database error occurred. Please try again.', 'danger')
-        
+        current_app.logger.error(f"SQLAlchemyError deleting checkpoint {checkpoint_id}: {e}", exc_info=True)
+        flash('A database error occurred while deleting the checkpoint.', 'danger')
     except Exception as e:
         db.session.rollback()
-        current_app.logger.critical(f"Unexpected error deleting checkpoint {id} for client {current_user.client_id}: {e}", exc_info=True)
-        flash('An unexpected error occurred. Please try again or contact support.', 'danger')
-    
+        current_app.logger.critical(f"Unexpected error deleting checkpoint {checkpoint_id}: {e}", exc_info=True)
+        flash('An unexpected error occurred. Please contact support.', 'danger')
+        
     return redirect(url_for('client_portal.list_checkpoints'))
 
 @bp.route('/shifts/add', methods=['GET', 'POST'])
 @login_required
+@client_portal_access_required
 def add_shift():
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
+    form = ShiftForm(client_id=current_user.client_id)
     
-    form = ShiftForm()
-    
-    # Populate form choices with only resources belonging to the current client
-    form.device_id.choices = [(d.id, f"{d.name or 'Unnamed'} ({d.imei})") 
-                             for d in Device.query.filter_by(client_id=current_user.client_id).order_by(Device.name).all()]
-    form.route_id.choices = [(r.id, r.name) 
-                            for r in Route.query.filter_by(client_id=current_user.client_id).order_by(Route.name).all()]
-    form.site_id.choices = [(s.id, s.name) 
-                           for s in Site.query.filter_by(client_id=current_user.client_id).order_by(Site.name).all()]
+    # Populate form choices with client's resources
+    form.device_id.choices = [(d.id, d.name) for d in Device.query.filter_by(client_id=current_user.client_id).order_by('name').all()]
+    form.route_id.choices = [(r.id, r.name) for r in Route.query.filter_by(client_id=current_user.client_id).order_by('name').all()]
+    form.site_id.choices = [(s.id, s.name) for s in Site.query.filter_by(client_id=current_user.client_id).order_by('name').all()]
     
     if form.validate_on_submit():
         try:
-            # Additional validation for device, route, and site ownership
-            device = db.session.get(Device, form.device_id.data)
-            route = db.session.get(Route, form.route_id.data)
-            site = db.session.get(Site, form.site_id.data)
-            
-            if not device or device.client_id != current_user.client_id:
-                flash('Invalid device selected.', 'danger')
-                current_app.logger.warning(f"Client {current_user.client_id} attempted to use invalid device {form.device_id.data}")
-                return render_template('client_portal/shifts/add_edit.html',
-                                    title='Add New Shift',
-                                    form=form,
-                                    action='Add')
-            
-            if not route or route.client_id != current_user.client_id:
-                flash('Invalid route selected.', 'danger')
-                current_app.logger.warning(f"Client {current_user.client_id} attempted to use invalid route {form.route_id.data}")
-                return render_template('client_portal/shifts/add_edit.html',
-                                    title='Add New Shift',
-                                    form=form,
-                                    action='Add')
-            
-            if not site or site.client_id != current_user.client_id:
-                flash('Invalid site selected.', 'danger')
-                current_app.logger.warning(f"Client {current_user.client_id} attempted to use invalid site {form.site_id.data}")
-                return render_template('client_portal/shifts/add_edit.html',
-                                    title='Add New Shift',
-                                    form=form,
-                                    action='Add')
-            
-            # Check for overlapping shifts for the same device
-            start_datetime = datetime.combine(form.scheduled_date.data, form.scheduled_start_time.data)
-            end_datetime = datetime.combine(form.scheduled_date.data, form.scheduled_end_time.data)
-            
-            overlapping_shift = Shift.query.filter(
-                Shift.device_id == form.device_id.data,
-                Shift.scheduled_date == form.scheduled_date.data,
-                ((Shift.scheduled_start_time <= form.scheduled_start_time.data) & 
-                 (Shift.scheduled_end_time > form.scheduled_start_time.data)) |
-                ((Shift.scheduled_start_time < form.scheduled_end_time.data) & 
-                 (Shift.scheduled_end_time >= form.scheduled_end_time.data))
-            ).first()
-            
-            if overlapping_shift:
-                flash(f'Error: Device is already scheduled for an overlapping shift on {form.scheduled_date.data}.', 'danger')
-                current_app.logger.warning(f"Client {current_user.client_id} attempted to create overlapping shift for device {form.device_id.data}")
-                return render_template('client_portal/shifts/add_edit.html',
-                                    title='Add New Shift',
-                                    form=form,
-                                    action='Add')
-            
-            # Create the shift
-            shift = Shift(
+            new_shift = Shift(
                 device_id=form.device_id.data,
                 route_id=form.route_id.data,
                 site_id=form.site_id.data,
@@ -991,91 +711,50 @@ def add_shift():
                 scheduled_end_time=form.scheduled_end_time.data,
                 shift_type=form.shift_type.data
             )
-            db.session.add(shift)
+            db.session.add(new_shift)
             db.session.commit()
             
-            flash('Shift added successfully!', 'success')
-            current_app.logger.info(f"Client {current_user.client_id} added new shift: Device {device.imei} on Route '{route.name}' at Site '{site.name}' (ID: {shift.id})")
+            flash(f"Shift scheduled successfully!", 'success')
+            current_app.logger.info(f"ClientUser {current_user.id} created shift {new_shift.id}.")
             return redirect(url_for('client_portal.list_shifts'))
-            
         except IntegrityError as e:
             db.session.rollback()
-            error_msg = str(e)
-            if "UNIQUE constraint failed" in error_msg:
-                flash('Error: A shift with these details already exists.', 'danger')
-            else:
-                flash('Error: A data conflict occurred. Please check your input and try again.', 'danger')
-            current_app.logger.error(f"IntegrityError adding shift for client {current_user.client_id}: {error_msg}", exc_info=True)
-            
+            current_app.logger.warning(f"IntegrityError for Client {current_user.client_id} adding shift: {e}")
+            flash('Error: This shift conflicts with an existing schedule.', 'danger')
         except SQLAlchemyError as e:
             db.session.rollback()
-            current_app.logger.error(f"Database error adding shift for client {current_user.client_id}: {str(e)}", exc_info=True)
+            current_app.logger.error(f"SQLAlchemyError adding shift for client {current_user.client_id}: {e}", exc_info=True)
             flash('A database error occurred. Please try again.', 'danger')
-            
         except Exception as e:
             db.session.rollback()
-            current_app.logger.critical(f"Unexpected error adding shift for client {current_user.client_id}: {str(e)}", exc_info=True)
-            flash('An unexpected error occurred. Please try again or contact support.', 'danger')
+            current_app.logger.critical(f"Unexpected error for Client {current_user.client_id} adding shift: {e}", exc_info=True)
+            flash('An unexpected error occurred. Please contact support.', 'danger')
     
-    return render_template('client_portal/shifts/add_edit.html',
-                         title='Add New Shift',
-                         form=form,
-                         action='Add')
+    return render_template('client_portal/shifts/add_edit.html', title='Schedule New Shift', form=form, form_action_label='Schedule Shift')
 
-@bp.route('/shifts/<int:id>/edit', methods=['GET', 'POST'])
+@bp.route('/shifts/edit/<int:shift_id>', methods=['GET', 'POST'])
 @login_required
-def edit_shift(id):
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
+@client_portal_access_required
+def edit_shift(shift_id):
+    shift = db.session.get(Shift, shift_id)
+    if not shift:
+        abort(404)
     
-    shift = Shift.query.join(Device).filter(
-        Shift.id == id,
-        Device.client_id == current_user.client_id
-    ).first_or_404()
+    # Verify ownership through device
+    device = db.session.get(Device, shift.device_id)
+    if not device or device.client_id != current_user.client_id:
+        current_app.logger.warning(f"ClientUser {current_user.id} unauthorized edit attempt on shift {shift_id}.")
+        abort(404)
     
-    has_reports = shift.uploaded_reports.first() is not None
-    if has_reports:
-        flash('Warning: This shift has associated patrol reports. Changes may affect report validity.', 'warning')
-    
-    form = ShiftForm(obj=shift, editing_shift_id=id)
+    form = ShiftForm(obj=shift, editing_shift_id=shift_id, client_id=current_user.client_id)
     
     # Populate form choices
-    form.device_id.choices = [(d.id, f"{d.name or 'Unnamed'} ({d.imei})") 
-                             for d in Device.query.filter_by(client_id=current_user.client_id).order_by(Device.name).all()]
-    form.route_id.choices = [(r.id, r.name) 
-                            for r in Route.query.filter_by(client_id=current_user.client_id).order_by(Route.name).all()]
-    form.site_id.choices = [(s.id, s.name) 
-                           for s in Site.query.filter_by(client_id=current_user.client_id).order_by(Site.name).all()]
+    form.device_id.choices = [(d.id, d.name) for d in Device.query.filter_by(client_id=current_user.client_id).order_by('name').all()]
+    form.route_id.choices = [(r.id, r.name) for r in Route.query.filter_by(client_id=current_user.client_id).order_by('name').all()]
+    form.site_id.choices = [(s.id, s.name) for s in Site.query.filter_by(client_id=current_user.client_id).order_by('name').all()]
     
     if form.validate_on_submit():
         try:
-            # Validate resource ownership
-            device = db.session.get(Device, form.device_id.data)
-            route = db.session.get(Route, form.route_id.data)
-            site = db.session.get(Site, form.site_id.data)
-            
-            if not all([device, route, site]) or any(r.client_id != current_user.client_id for r in [device, route, site]):
-                flash('Invalid resource selected.', 'danger')
-                return render_template('client_portal/shifts/add_edit.html',
-                                    title='Edit Shift',
-                                    form=form,
-                                    shift=shift,
-                                    action='Edit')
-            
-            # Check for critical changes if shift has reports
-            if has_reports:
-                critical_changes = (
-                    shift.device_id != form.device_id.data or
-                    shift.route_id != form.route_id.data or
-                    shift.scheduled_date != form.scheduled_date.data or
-                    shift.scheduled_start_time != form.scheduled_start_time.data or
-                    shift.scheduled_end_time != form.scheduled_end_time.data
-                )
-                if critical_changes:
-                    flash('Warning: You are changing critical fields of a shift with associated reports.', 'warning')
-            
-            # Update shift
             shift.device_id = form.device_id.data
             shift.route_id = form.route_id.data
             shift.site_id = form.site_id.data
@@ -1085,80 +764,58 @@ def edit_shift(id):
             shift.shift_type = form.shift_type.data
             
             db.session.commit()
-            flash('Shift updated successfully!', 'success')
-            current_app.logger.info(f"Client {current_user.client_id} updated shift {id}")
+            flash(f"Shift updated successfully!", 'success')
+            current_app.logger.info(f"ClientUser {current_user.id} updated shift {shift.id}.")
             return redirect(url_for('client_portal.list_shifts'))
-            
         except IntegrityError as e:
             db.session.rollback()
-            flash('Error: A data conflict occurred. Please check your input and try again.', 'danger')
-            current_app.logger.error(f"IntegrityError updating shift {id}: {str(e)}", exc_info=True)
-            
+            current_app.logger.warning(f"IntegrityError for Client {current_user.client_id} editing shift {shift_id}: {e}")
+            flash('Error: This shift conflicts with an existing schedule.', 'danger')
         except SQLAlchemyError as e:
             db.session.rollback()
+            current_app.logger.error(f"SQLAlchemyError editing shift {shift_id}: {e}", exc_info=True)
             flash('A database error occurred. Please try again.', 'danger')
-            current_app.logger.error(f"Database error updating shift {id}: {str(e)}", exc_info=True)
-            
         except Exception as e:
             db.session.rollback()
-            flash('An unexpected error occurred. Please try again or contact support.', 'danger')
-            current_app.logger.critical(f"Unexpected error updating shift {id}: {str(e)}", exc_info=True)
+            current_app.logger.critical(f"Unexpected error editing shift {shift_id}: {e}", exc_info=True)
+            flash('An unexpected error occurred. Please contact support.', 'danger')
     
-    return render_template('client_portal/shifts/add_edit.html',
-                         title='Edit Shift',
-                         form=form,
-                         shift=shift,
-                         action='Edit')
+    return render_template('client_portal/shifts/add_edit.html', title=f"Edit Shift", form=form, shift=shift, form_action_label='Update Shift')
 
-@bp.route('/shifts/<int:id>/delete', methods=['POST'])
+@bp.route('/shifts/delete/<int:shift_id>', methods=['POST'])
 @login_required
-def delete_shift(id):
-    if not current_user.is_client_user_type():
-        flash('Please log in to access the client portal.', 'warning')
-        return redirect(url_for('client_portal.login'))
+@client_portal_access_required
+def delete_shift(shift_id):
+    shift = db.session.get(Shift, shift_id)
+    if not shift:
+        flash("Shift not found.", 'danger')
+        return redirect(url_for('client_portal.list_shifts'))
+    
+    # Verify ownership through device
+    device = db.session.get(Device, shift.device_id)
+    if not device or device.client_id != current_user.client_id:
+        flash("You do not have permission to delete this shift.", 'danger')
+        return redirect(url_for('client_portal.list_shifts'))
+    
+    # Check if shift has associated reports
+    if shift.patrol_reports:
+        flash(f"Error: This shift cannot be deleted because it has patrol reports associated with it.", 'danger')
+        current_app.logger.warning(f"ClientUser {current_user.id} attempt to delete shift {shift_id} with associated reports.")
+        return redirect(url_for('client_portal.list_shifts'))
     
     try:
-        # Fetch the shift and verify ownership
-        shift = Shift.query.join(Device).filter(
-            Shift.id == id,
-            Device.client_id == current_user.client_id
-        ).first_or_404()
-        
-        # Check for associated reports
-        if shift.uploaded_reports.first():
-            flash('Cannot delete shift: It has associated patrol reports.', 'danger')
-            current_app.logger.warning(f"Client {current_user.client_id} attempted to delete shift {id} with associated reports")
-            return redirect(url_for('client_portal.list_shifts'))
-        
-        # Check for active patrols
-        if shift.active_patrols.first():
-            flash('Cannot delete shift: It has active patrols.', 'danger')
-            current_app.logger.warning(f"Client {current_user.client_id} attempted to delete shift {id} with active patrols")
-            return redirect(url_for('client_portal.list_shifts'))
-        
-        # Log the deletion attempt
-        current_app.logger.info(f"Client {current_user.client_id} deleting shift {id} (Device: {shift.device.imei}, Route: {shift.route.name}, Site: {shift.site.name})")
-        
-        # Delete the shift
+        shift_info = f"{shift.scheduled_date.strftime('%Y-%m-%d')} {shift.scheduled_start_time.strftime('%H:%M')}-{shift.scheduled_end_time.strftime('%H:%M')}"
         db.session.delete(shift)
         db.session.commit()
-        
-        flash('Shift deleted successfully!', 'success')
-        current_app.logger.info(f"Client {current_user.client_id} successfully deleted shift {id}")
-        
-    except IntegrityError as e:
-        db.session.rollback()
-        flash('Error: Cannot delete shift due to existing dependencies.', 'danger')
-        current_app.logger.error(f"IntegrityError deleting shift {id} for client {current_user.client_id}: {str(e)}", exc_info=True)
-        
+        flash(f"Shift ({shift_info}) deleted successfully.", 'success')
+        current_app.logger.info(f"ClientUser {current_user.id} deleted shift {shift_id}.")
     except SQLAlchemyError as e:
         db.session.rollback()
+        current_app.logger.error(f"SQLAlchemyError deleting shift {shift_id}: {e}", exc_info=True)
         flash('A database error occurred while deleting the shift.', 'danger')
-        current_app.logger.error(f"Database error deleting shift {id} for client {current_user.client_id}: {str(e)}", exc_info=True)
-        
     except Exception as e:
         db.session.rollback()
-        flash('An unexpected error occurred while deleting the shift.', 'danger')
-        current_app.logger.critical(f"Unexpected error deleting shift {id} for client {current_user.client_id}: {str(e)}", exc_info=True)
+        current_app.logger.critical(f"Unexpected error deleting shift {shift_id}: {e}", exc_info=True)
+        flash('An unexpected error occurred. Please contact support.', 'danger')
     
     return redirect(url_for('client_portal.list_shifts')) 

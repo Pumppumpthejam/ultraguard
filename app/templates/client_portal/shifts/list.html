@@ -1,53 +1,63 @@
 {% extends "client_portal_base.html" %}
 
+{% block title %}My Shifts - Ultraguard{% endblock %}
+
 {% block page_header %}My Shifts{% endblock %}
 
+{% block page_actions %}
+    <a href="{{ url_for('client_portal.add_shift') }}" class="btn btn-success">
+        <i class="bi bi-plus-circle-fill"></i> Schedule New Shift
+    </a>
+{% endblock %}
+
 {% block content %}
-<div class="container-fluid px-4">
-    <div class="row">
-        <div class="col-12">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <i class="fas fa-clock me-1"></i>
-                    Shifts
-                    <a href="{{ url_for('client_portal.add_shift') }}" class="btn btn-sm btn-success float-end">+ Add Shift</a>
-                </div>
-                <div class="card-body">
-                    {% if shifts %}
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Device</th>
-                                        <th>Type</th>
-                                        <th>Start Time</th>
-                                        <th>End Time</th>
-                                        <th>Status</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for shift in shifts %}
-                                    <tr>
-                                        <td>{{ shift.device.name if shift.device else 'N/A' }}</td>
-                                        <td>{{ shift.shift_type|title }}</td>
-                                        <td>{{ shift.scheduled_start_time.strftime('%Y-%m-%d %H:%M') if shift.scheduled_start_time else 'N/A' }}</td>
-                                        <td>{{ shift.scheduled_end_time.strftime('%Y-%m-%d %H:%M') if shift.scheduled_end_time else 'N/A' }}</td>
-                                        <td>{{ shift.status|title }}</td>
-                                        <td>
-                                            <a href="{{ url_for('client_portal.edit_shift', id=shift.id) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <p class="text-center">No shifts found.</p>
-                    {% endif %}
-                </div>
-            </div>
+    {% if shifts %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Time</th>
+                        <th>Device</th>
+                        <th>Route</th>
+                        <th>Site</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for shift in shifts %}
+                    <tr>
+                        <td>{{ shift.scheduled_date.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ shift.scheduled_start_time.strftime('%H:%M') }} - {{ shift.scheduled_end_time.strftime('%H:%M') }}</td>
+                        <td>{{ shift.device.name }}</td>
+                        <td>{{ shift.route.name }}</td>
+                        <td>{{ shift.site.name }}</td>
+                        <td><span class="badge bg-info">{{ shift.shift_type.title() }}</span></td>
+                        <td>
+                            {% if shift.is_completed %}
+                                <span class="badge bg-success">Completed</span>
+                            {% elif shift.is_in_progress %}
+                                <span class="badge bg-warning">In Progress</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Scheduled</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('client_portal.edit_shift', shift_id=shift.id) }}" class="btn btn-sm btn-outline-primary me-1" title="Edit Shift"><i class="bi bi-pencil-fill"></i></a>
+                            <form method="POST" action="{{ url_for('client_portal.delete_shift', shift_id=shift.id) }}" style="display:inline;"
+                                  onsubmit="return confirm('Are you sure you want to delete this shift? This action cannot be undone.');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                                <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Shift"><i class="bi bi-trash-fill"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-    </div>
-</div>
+    {% else %}
+        <div class="alert alert-info">You haven't scheduled any shifts yet. <a href="{{ url_for('client_portal.add_shift') }}">Schedule your first shift now!</a></div>
+    {% endif %}
 {% endblock %} 

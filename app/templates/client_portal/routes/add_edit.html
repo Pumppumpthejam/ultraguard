@@ -1,0 +1,34 @@
+{% extends "client_portal_base.html" %}
+{% from "_form_helpers.html" import render_field, render_textarea_field %}
+
+{% block title %}{{ title }} - Ultraguard{% endblock %}
+
+{% block page_header %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-7">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <form method="POST" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    {{ render_field(form.name, class="form-control", placeholder="e.g., Perimeter Patrol, Nightly Building Check") }}
+                    
+                    {{ render_textarea_field(form.description, class="form-control", rows="3", placeholder="Optional: A brief summary of what this route covers.") }}
+
+                    {{ render_field(form.checkpoints, class="form-select", size=8) }}
+                    <div class="form-text">
+                        Hold down Ctrl (or Command on Mac) to select more than one checkpoint.
+                    </div>
+
+                    <div class="mt-4">
+                        {{ form.submit(class="btn btn-primary", value=form_action_label) }}
+                        <a href="{{ url_for('client_portal.list_routes') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

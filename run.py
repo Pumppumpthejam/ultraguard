@@ -4,7 +4,7 @@ from config import config_by_name # Import the dictionary of config classes
 from app import models # <--- ADD THIS IMPORT
 
 # Determine which configuration to use (TEMPORARILY HARDCODED FOR POSTGRESQL TESTING)
-config_name = 'production' # Force production config
+config_name = os.getenv('FLASK_CONFIG', 'development')
 # selected_config = config_by_name.get(config_name, config_by_name['default']) # No longer needed
 
 # Create the Flask app instance using the selected configuration

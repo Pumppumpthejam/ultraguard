@@ -47,14 +47,7 @@ class DevelopmentConfig(Config):
     DEBUG = True
     SESSION_COOKIE_SECURE = False
     REMEMBER_COOKIE_SECURE = False
-    # Temporarily force DevelopmentConfig to use PostgreSQL for debugging
-    DB_USER = os.environ.get('PROD_DB_USER') or 'ultraguard_user'
-    DB_PASSWORD = os.environ.get('PROD_DB_PASSWORD') or 'yoursecurepassword'
-    DB_HOST = os.environ.get('PROD_DB_HOST') or 'localhost'
-    DB_PORT = os.environ.get('PROD_DB_PORT') or '5432'
-    DB_NAME = os.environ.get('PROD_DB_NAME') or 'ultraguard_db'
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URI') or \
-        f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(project_root, 'instance', 'ultraguard.db')
     # SQLALCHEMY_ECHO = True  # Uncomment to see SQL queries printed to console
 
 class TestingConfig(Config):

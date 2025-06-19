@@ -5,6 +5,7 @@ from wtforms.validators import DataRequired, Length, Optional, ValidationError
 from app.models import Checkpoint, Device, Route, Site, Shift
 from datetime import datetime, time, timedelta
 from flask_sqlalchemy import SQLAlchemy
+from flask_login import current_user
 
 db = SQLAlchemy()
 
@@ -15,10 +16,30 @@ class ClientLoginForm(FlaskForm):
     submit = SubmitField('Sign In')
 
 class SiteForm(FlaskForm):
-    name = StringField('Site Name', validators=[DataRequired(), Length(min=2, max=100)])
-    address = TextAreaField('Address', validators=[DataRequired(), Length(min=5, max=500)])
+    name = StringField('Site Name', validators=[DataRequired(), Length(min=3, max=150)])
+    address = TextAreaField('Address', validators=[Optional(), Length(max=500)])
     description = TextAreaField('Description', validators=[Optional(), Length(max=1000)])
     submit = SubmitField('Save Site')
+
+    def __init__(self, original_name=None, client_id=None, *args, **kwargs):
+        super(SiteForm, self).__init__(*args, **kwargs)
+        self.original_name = original_name # For edit mode, to check if name changed
+        self.client_id = client_id # To scope uniqueness check
+
+    def validate_name(self, name):
+        # If name hasn't changed during an edit, no need to check for uniqueness against itself
+        if self.original_name and self.original_name == name.data:
+            return
+        
+        # Check if site name is unique for the current client
+        query_client_id = self.client_id or (current_user.is_authenticated and current_user.client_id)
+        if not query_client_id:
+            # This should ideally not happen if form is used correctly in client portal
+            raise ValidationError("Client association is missing for validation.")
+
+        existing_site = Site.query.filter_by(client_id=query_client_id, name=name.data).first()
+        if existing_site:
+            raise ValidationError('A site with this name already exists for your client. Please use a different name.')
 
 class CheckpointForm(FlaskForm):
     name = StringField('Checkpoint Name', validators=[DataRequired(), Length(min=2, max=100)])
@@ -27,6 +48,23 @@ class CheckpointForm(FlaskForm):
     radius = StringField('Verification Radius (meters)', validators=[DataRequired()])
     description = TextAreaField('Description', validators=[Optional(), Length(max=1000)])
     submit = SubmitField('Save Checkpoint')
+
+    def __init__(self, original_name=None, client_id=None, *args, **kwargs):
+        super(CheckpointForm, self).__init__(*args, **kwargs)
+        self.original_name = original_name
+        self.client_id = client_id
+
+    def validate_name(self, name):
+        if self.original_name and self.original_name == name.data:
+            return
+        
+        query_client_id = self.client_id or (current_user.is_authenticated and current_user.client_id)
+        if not query_client_id:
+            raise ValidationError("Client association is missing for validation.")
+
+        existing_checkpoint = Checkpoint.query.filter_by(client_id=query_client_id, name=name.data).first()
+        if existing_checkpoint:
+            raise ValidationError('A checkpoint with this name already exists for your client. Please use a different name.')
 
     def validate_latitude(self, field):
         try:
@@ -83,10 +121,24 @@ class RouteForm(FlaskForm):
     submit = SubmitField('Save Route')
 
     def __init__(self, *args, **kwargs):
+        self.original_name = kwargs.pop('original_name', None)
+        self.client_id = kwargs.pop('client_id', None)
         super(RouteForm, self).__init__(*args, **kwargs)
         # The choices for checkpoints will be populated by the route function
         # to scope it to the current client's checkpoints
         self.checkpoints.choices = []
+
+    def validate_name(self, name):
+        if self.original_name and self.original_name == name.data:
+            return
+        
+        query_client_id = self.client_id or (current_user.is_authenticated and current_user.client_id)
+        if not query_client_id:
+            raise ValidationError("Client association is missing for validation.")
+
+        existing_route = Route.query.filter_by(client_id=query_client_id, name=name.data).first()
+        if existing_route:
+            raise ValidationError('A route with this name already exists for your client. Please use a different name.')
 
     def validate_checkpoints(self, field):
         if not field.data:
@@ -121,6 +173,7 @@ class ShiftForm(FlaskForm):
 
     def __init__(self, *args, **kwargs):
         self.editing_shift_id = kwargs.pop('editing_shift_id', None)
+        self.client_id = kwargs.pop('client_id', None)  # For consistency with other forms
         super(ShiftForm, self).__init__(*args, **kwargs)
         # The choices for device_id, route_id, and site_id will be populated by the route function
         # to scope them to the current client's resources
