@@ -21,7 +21,6 @@
                         <th>Device</th>
                         <th>Route</th>
                         <th>Site</th>
-                        <th>Type</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -29,19 +28,18 @@
                 <tbody>
                     {% for shift in shifts %}
                     <tr>
-                        <td>{{ shift.scheduled_date.strftime('%Y-%m-%d') }}</td>
-                        <td>{{ shift.scheduled_start_time.strftime('%H:%M') }} - {{ shift.scheduled_end_time.strftime('%H:%M') }}</td>
+                        <td>{{ shift.start_time.strftime('%Y-%m-%d') }}</td>
+                        <td>{{ shift.start_time.strftime('%H:%M') }} - {{ shift.end_time.strftime('%H:%M') if shift.end_time else 'N/A' }}</td>
                         <td>{{ shift.device.name }}</td>
                         <td>{{ shift.route.name }}</td>
                         <td>{{ shift.site.name }}</td>
-                        <td><span class="badge bg-info">{{ shift.shift_type.title() }}</span></td>
                         <td>
-                            {% if shift.is_completed %}
+                            {% if shift.status == 'completed' %}
                                 <span class="badge bg-success">Completed</span>
-                            {% elif shift.is_in_progress %}
+                            {% elif shift.status == 'in_progress' %}
                                 <span class="badge bg-warning">In Progress</span>
                             {% else %}
-                                <span class="badge bg-secondary">Scheduled</span>
+                                <span class="badge bg-secondary">{{ shift.status.title() }}</span>
                             {% endif %}
                         </td>
                         <td>

@@ -35,6 +35,23 @@
     </div>
 {% endmacro %}
 
+{% macro render_textarea_field(field, class="form-control", rows="3", help_text=None, placeholder=None, **kwargs) %}
+    <div class="mb-3">
+        {{ field.label(class="form-label") }}
+        {% if field.errors %}
+            {{ field(class=class + " is-invalid", rows=rows, placeholder=placeholder or field.label.text, **kwargs) }}
+            <div class="invalid-feedback">
+                {% for error in field.errors %}<span>{{ error }}</span>{% endfor %}
+            </div>
+        {% else %}
+            {{ field(class=class, rows=rows, placeholder=placeholder or field.label.text, **kwargs) }}
+        {% endif %}
+        {% if help_text %}
+            <small class="form-text text-muted">{{ help_text }}</small>
+        {% endif %}
+    </div>
+{% endmacro %}
+
 {% macro render_select_field(field, class="form-select", help_text=None) %}
 <div class="mb-3">
     {{ field.label(class="form-label") }}

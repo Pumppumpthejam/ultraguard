@@ -30,6 +30,10 @@ def create_app(config_name: str):
     selected_config = config_by_name[config_name]
     app.config.from_object(selected_config)
 
+    # Register custom template filters
+    from . import template_filters
+    template_filters.init_app(app)
+
     # !!! DEBUGGING AID !!!
     app.logger.info(f"Loading config: {config_name}")
     app.logger.info(f"Database URI: {app.config['SQLALCHEMY_DATABASE_URI']}")

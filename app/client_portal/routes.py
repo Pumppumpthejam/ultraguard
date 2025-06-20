@@ -486,7 +486,7 @@ def list_shifts():
     shifts = Shift.query\
         .join(Device, Shift.device_id == Device.id)\
         .filter(Device.client_id == current_user.client_id)\
-        .order_by(Shift.scheduled_date.desc(), Shift.scheduled_start_time)\
+        .order_by(Shift.start_time.desc())\
         .all()
     return render_template('client_portal/shifts/list.html', title='My Shifts', shifts=shifts)
 
@@ -702,14 +702,17 @@ def add_shift():
     
     if form.validate_on_submit():
         try:
+            # Combine date and time fields into datetime objects
+            start_datetime = datetime.combine(form.scheduled_date.data, form.scheduled_start_time.data)
+            end_datetime = datetime.combine(form.scheduled_date.data, form.scheduled_end_time.data)
+            
             new_shift = Shift(
                 device_id=form.device_id.data,
                 route_id=form.route_id.data,
                 site_id=form.site_id.data,
-                scheduled_date=form.scheduled_date.data,
-                scheduled_start_time=form.scheduled_start_time.data,
-                scheduled_end_time=form.scheduled_end_time.data,
-                shift_type=form.shift_type.data
+                start_time=start_datetime,
+                end_time=end_datetime,
+                status='active'
             )
             db.session.add(new_shift)
             db.session.commit()
@@ -755,13 +758,15 @@ def edit_shift(shift_id):
     
     if form.validate_on_submit():
         try:
+            # Combine date and time fields into datetime objects
+            start_datetime = datetime.combine(form.scheduled_date.data, form.scheduled_start_time.data)
+            end_datetime = datetime.combine(form.scheduled_date.data, form.scheduled_end_time.data)
+            
             shift.device_id = form.device_id.data
             shift.route_id = form.route_id.data
             shift.site_id = form.site_id.data
-            shift.scheduled_date = form.scheduled_date.data
-            shift.scheduled_start_time = form.scheduled_start_time.data
-            shift.scheduled_end_time = form.scheduled_end_time.data
-            shift.shift_type = form.shift_type.data
+            shift.start_time = start_datetime
+            shift.end_time = end_datetime
             
             db.session.commit()
             flash(f"Shift updated successfully!", 'success')
@@ -804,7 +809,7 @@ def delete_shift(shift_id):
         return redirect(url_for('client_portal.list_shifts'))
     
     try:
-        shift_info = f"{shift.scheduled_date.strftime('%Y-%m-%d')} {shift.scheduled_start_time.strftime('%H:%M')}-{shift.scheduled_end_time.strftime('%H:%M')}"
+        shift_info = f"{shift.start_time.strftime('%Y-%m-%d')} {shift.start_time.strftime('%H:%M')}-{shift.end_time.strftime('%H:%M')}"
         db.session.delete(shift)
         db.session.commit()
         flash(f"Shift ({shift_info}) deleted successfully.", 'success')
