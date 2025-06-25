@@ -35,16 +35,18 @@
     </div>
 {% endmacro %}
 
-{% macro render_textarea_field(field, class="form-control", rows="3", help_text=None, placeholder=None, **kwargs) %}
+{% macro render_textarea_field(field, class="form-control", rows="3", help_text=None, placeholder=None, extra_attrs=None) %}
     <div class="mb-3">
         {{ field.label(class="form-label") }}
+        {% set field_class = class + (" is-invalid" if field.errors else "") %}
+        {% set attrs = extra_attrs if extra_attrs else {} %}
         {% if field.errors %}
-            {{ field(class=class + " is-invalid", rows=rows, placeholder=placeholder or field.label.text, **kwargs) }}
+            {{ field(class=field_class, rows=rows, placeholder=placeholder or field.label.text, **attrs) }}
             <div class="invalid-feedback">
                 {% for error in field.errors %}<span>{{ error }}</span>{% endfor %}
             </div>
         {% else %}
-            {{ field(class=class, rows=rows, placeholder=placeholder or field.label.text, **kwargs) }}
+            {{ field(class=class, rows=rows, placeholder=placeholder or field.label.text, **attrs) }}
         {% endif %}
         {% if help_text %}
             <small class="form-text text-muted">{{ help_text }}</small>
