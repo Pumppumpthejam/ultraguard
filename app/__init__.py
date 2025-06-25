@@ -10,6 +10,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime, timezone
 from sqlalchemy import text
+from flask_wtf import CSRFProtect
 
 db = SQLAlchemy() # Initialize SQLAlchemy extension
 migrate = Migrate() # Initialize Flask-Migrate
@@ -49,6 +50,10 @@ def create_app(config_name: str):
     db.init_app(app)
     migrate.init_app(app, db) # Initialize Flask-Migrate with the app and SQLAlchemy
     login_manager.init_app(app) # Initialize LoginManager with the app
+
+    # Initialize CSRF protection
+    csrf = CSRFProtect()
+    csrf.init_app(app)
 
     # Register CLI commands
     from app import commands
