@@ -15,7 +15,7 @@
 
                     <div class="row">
                         <div class="col-md-6">
-                            {{ render_select_field(form.device_id, class="form-select", placeholder="Select Device") }}
+                            {{ render_select_field(form.device_id, class="form-select", extra_attrs={'placeholder': 'Select Device'}) }}
                         </div>
                         <div class="col-md-6">
                             {{ render_select_field(form.shift_type, class="form-select") }}
@@ -24,10 +24,10 @@
 
                     <div class="row">
                         <div class="col-md-6">
-                            {{ render_select_field(form.route_id, class="form-select", placeholder="Select Route") }}
+                            {{ render_select_field(form.route_id, class="form-select", extra_attrs={'placeholder': 'Select Route'}) }}
                         </div>
                         <div class="col-md-6">
-                            {{ render_select_field(form.site_id, class="form-select", placeholder="Select Site") }}
+                            {{ render_select_field(form.site_id, class="form-select", extra_attrs={'placeholder': 'Select Site'}) }}
                         </div>
                     </div>
 
