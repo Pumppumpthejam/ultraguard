@@ -54,10 +54,12 @@
     </div>
 {% endmacro %}
 
-{% macro render_select_field(field, class="form-select", help_text=None) %}
+{% macro render_select_field(field, class="form-select", help_text=None, extra_attrs=None) %}
 <div class="mb-3">
     {{ field.label(class="form-label") }}
-    {{ field(class=class + (" is-invalid" if field.errors else "")) }}
+    {% set field_class = class + (" is-invalid" if field.errors else "") %}
+    {% set attrs = extra_attrs if extra_attrs else {} %}
+    {{ field(class=field_class, **attrs) }}
     {% if field.errors %}
         <div class="invalid-feedback">
             {% for error in field.errors %}<span>{{ error }}</span>{% endfor %}
